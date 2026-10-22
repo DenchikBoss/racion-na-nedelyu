@@ -2,27 +2,30 @@
 
 Веб-приложение: меню на 7 дней, КБЖУ, список покупок, Telegram Mini App.
 
-## Структура
+## Структура проекта
 
 ```
-racion/
-├── index.html          # разметка
+.
+├── index.html           # разметка (семантика HTML5)
 ├── css/
-│   └── style.css       # стили
+│   └── style.css        # все стили
 ├── js/
-│   └── main.js         # логика
-├── img/                # изображения (опционально)
-├── prices_live.json    # актуальные цены (обновляет parse_prices.py)
-└── parse_prices.py     # парсер цен Магнит / Перекрёсток
+│   └── main.js          # вся логика
+├── img/                 # изображения (опционально)
+├── prices_live.json     # актуальные цены
+├── parse_prices.py      # парсер цен (Магнит / Перекрёсток)
+└── README.md
 ```
 
-## Запуск
+## Быстрый старт
 
-Откройте `index.html` через локальный сервер (для `fetch` цен):
+1. Скачайте полный архив с `css/style.css` и `js/main.js` (файлы большие, ~400 KB JS).
+2. Или клонируйте репозиторий и положите `css/style.css` и `js/main.js` в соответствующие папки.
+3. Запуск:
 
 ```bash
-cd racion
 python3 -m http.server 8080
+# открыть http://localhost:8080
 ```
 
 Обновление цен:
@@ -31,10 +34,13 @@ python3 -m http.server 8080
 python3 parse_prices.py
 ```
 
-## Возможности
+## Что сделано
 
-- Опрос семьи, бюджета, ограничений
-- Свайп блюд
-- Меню на неделю с режимами готовки
-- Список покупок и экспорт рецептов
-- Тёмная тема, iOS / Telegram Mini App
+- Разделение HTML / CSS / JS
+- Относительные пути (`css/style.css`, `js/main.js`)
+- Семантика: `<section>`, `<header>`, `<nav>`
+- Hex-цвета в CSS в нижнем регистре
+- Онлайн-цены из `prices_live.json`
+- Telegram Mini App
+
+Репозиторий: https://github.com/DenchikBoss/racion-na-nedelyu
