@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="description" content="Собери меню на неделю под семью, бюджет и вкус — со списком покупок. Тест за 2 минуты.">
+<meta name="theme-color" content="#e07a3d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Рацион">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="format-detection" content="telephone=no">
+<title>Рацион на неделю</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+
+<!-- WELCOME -->
+<section id="screen-welcome" class="screen active">
+  <header class="header">
+    <div></div>
+    <button class="theme-toggle" data-theme-btn aria-label="Тема">🌙</button>
+  </header>
+  <div class="welcome-hero">
+    <div class="logo">🥗</div>
+    <h1>Рацион на неделю</h1>
+    <p>Собери меню под семью, бюджет и вкус — со списком покупок. Около 2 минут.</p>
+    <p class="ios-tip" style="font-size:.78rem;color:var(--text-muted);margin-top:10px;line-height:1.4">📱 Браузер, iPhone или Telegram. Цены подтягиваются из prices_live.json (Магнит / Впрок), кэш 12 ч.</p>
+    <div class="features">
+      <div class="feature"><span class="icon">👨‍👩‍👧</span><span>Меню на всю семью с учётом порций</span></div>
+      <div class="feature"><span class="icon">⚡</span><span>Короткий тест и свайп блюд</span></div>
+      <div class="feature"><span class="icon">📊</span><span>Сбалансированное КБЖУ на 7 дней</span></div>
+      <div class="feature"><span class="icon">🛒</span><span>Список покупок по отделам</span></div>
+    </div>
+    <button class="btn btn-primary btn-block" id="startBtn">Собрать рацион</button>
+    <p class="disclaimer" style="margin-top:20px">Сервис не заменяет консультацию врача или диетолога. При заболеваниях обратитесь к специалисту.</p>
+  </div>
+</section>
+
+<!-- QUIZ -->
+<section id="screen-quiz" class="screen">
+  <header class="header">
+    <button class="btn btn-ghost" id="quizBack" aria-label="Назад">←</button>
+    <h1 id="quizStepName">Опрос</h1>
+    <button class="theme-toggle" data-theme-btn aria-label="Тема">🌙</button>
+  </header>
+  <div class="progress-wrap">
+    <div class="progress-meta">
+      <span id="quizStepLabel">Шаг 1</span>
+      <span id="quizStepCount">1 из 12</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="quizProgress" style="width:0%"></div></div>
+  </div>
+  <div id="quizContent"></div>
+  <div class="footer-actions">
+    <button class="btn btn-primary btn-block" id="quizNext" disabled>Далее</button>
+  </div>
+</section>
+
+<!-- SWIPER -->
+<section id="screen-swiper" class="screen">
+  <header class="header">
+    <button class="btn btn-ghost" id="swiperBack" aria-label="Назад">←</button>
+    <h1>Что тебе нравится?</h1>
+    <button class="theme-toggle" data-theme-btn aria-label="Тема">🌙</button>
+  </header>
+  <p style="color:var(--text-muted);font-size:.9rem;margin-bottom:8px;text-align:center">Вправо — нравится, влево — нет. Так соберём вкусовую карту.</p>
+  <div class="swiper-progress" id="swiperProgress">0 / 0</div>
+  <div class="swiper-container">
+    <div class="swiper-stack" id="swiperStack">
+      <div class="swipe-hint left" id="hintLeft">Не нравится</div>
+      <div class="swipe-hint right" id="hintRight">Нравится</div>
+      <div class="swipe-hint up" id="hintUp">★ Очень</div>
+    </div>
+    <div class="swiper-actions">
+      <button class="action-btn undo" id="btnUndo" aria-label="Отменить">↩</button>
+      <button class="action-btn no" id="btnNo" aria-label="Не нравится">✕</button>
+      <button class="action-btn super" id="btnSuper" aria-label="Очень нравится">★</button>
+      <button class="action-btn yes" id="btnYes" aria-label="Нравится">♥</button>
+    </div>
+  </div>
+  <button class="btn btn-secondary btn-block" id="btnFinishSwipe" style="margin-top:8px">Далее — собрать меню</button>
+</section>
+
+<!-- LOADING -->
+<section id="screen-loading" class="screen loading-screen">
+  <div class="loading-icon">🥗</div>
+  <h2>Собираем рацион…</h2>
+  <p style="color:var(--text-muted);margin-top:6px;font-size:.9rem">Подбираем блюда под семью и бюджет</p>
+  <div class="load-steps" id="loadSteps">
+    <div class="load-step" data-step="0"><span class="dot"></span>Считаем КБЖУ на семью</div>
+    <div class="load-step" data-step="1"><span class="dot"></span>Подтягиваем актуальные цены онлайн</div>
+    <div class="load-step" data-step="2"><span class="dot"></span>Подбираем блюда под вкусы</div>
+    <div class="load-step" data-step="3"><span class="dot"></span>Масштабируем порции и покупки</div>
+  </div>
+</section>
+
+<!-- MENU -->
+<section id="screen-menu" class="screen">
+  <header class="header">
+    <h1>Ваше меню</h1>
+    <button class="theme-toggle" data-theme-btn aria-label="Тема">🌙</button>
+  </header>
+  <div class="summary-card" id="menuSummary"></div>
+  <div class="family-kcal-box" id="familyKcalBox"></div>
+  <div class="portions-bar" id="portionsBar"></div>
+  <nav class="day-tabs" id="dayTabs" aria-label="Дни недели"></nav>
+  <div class="day-macros" id="dayMacros"></div>
+  <div id="dayMeals"></div>
+  <div class="nav-bottom" style="flex-direction:column;gap:10px">
+    <button class="btn btn-primary btn-block" id="btnToShop">🛒 Список покупок</button>
+    <button class="btn btn-secondary btn-block" id="btnExportRecipes">📖 Скачать рецепты (.txt)</button>
+    <button class="btn btn-ghost btn-block" id="btnRestart">🔄 Начать заново</button>
+  </div>
+  <p class="disclaimer">Сервис не заменяет консультацию врача. Минимальная калорийность ограничена для безопасности.</p>
+</section>
+
+<!-- SHOPPING -->
+<section id="screen-shop" class="screen">
+  <header class="header">
+    <button class="btn btn-ghost" id="shopBack">← Меню</button>
+    <h1>Список покупок</h1>
+    <button class="theme-toggle" data-theme-btn aria-label="Тема">🌙</button>
+  </header>
+  <div class="shop-total" id="shopTotal"></div>
+  <p class="price-note" id="priceNote" style="margin-bottom:12px"></p>
+  <div id="shopList"></div>
+  <div class="footer-actions">
+    <button class="btn btn-primary btn-block" id="btnCopyShop">📋 Копировать список</button>
+    <button class="btn btn-secondary btn-block" id="btnDownloadShop">⬇️ Скачать .txt</button>
+    <button class="btn btn-secondary btn-block" id="btnPrintShop">🖨 Печать</button>
+  </div>
+</section>
+
+<!-- REPLACE MODAL -->
+<div class="modal-overlay" id="replaceModal">
+  <div class="modal">
+    <h3>Заменить блюдо</h3>
+    <div id="altList"></div>
+    <button class="btn btn-secondary btn-block" id="closeModal" style="margin-top:12px">Отмена</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="recipeModal">
+  <div class="modal">
+    <div id="recipeBody"></div>
+    <button class="btn btn-secondary btn-block" id="btnExportOneRecipe" style="margin-top:8px">⬇️ Скачать этот рецепт</button>
+    <button class="btn btn-primary btn-block" id="closeRecipe" style="margin-top:8px">Закрыть</button>
+  </div>
+</div>
+
+  <script src="js/data.js"></script>
+  <script src="js/main.js" defer></script>
+</body>
+</html>
