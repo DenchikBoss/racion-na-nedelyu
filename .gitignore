@@ -4,3 +4,7 @@ __pycache__/
 *.pyc
 .idea/
 .vscode/
+
+# parser raw dumps
+magnit_prices_raw.json
+perekrestok_prices_raw.json

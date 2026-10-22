@@ -1,0 +1,66 @@
+# Обновление prices_live.json (Магнит / Перекрёсток)
+# Расписание: каждые 8 часов + ручной запуск из вкладки Actions
+
+name: Update prices
+
+on:
+  schedule:
+    # 05:00, 13:00, 21:00 UTC ≈ 08:00, 16:00, 00:00 MSK
+    - cron: "0 5,13,21 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-prices
+  cancel-in-progress: false
+
+jobs:
+  parse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run price parser (Magnit)
+        # Только Магнит по умолчанию — стабильнее без прокси.
+        # Перекрёсток часто отдаёт 403 из датацентров GitHub.
+        run: python3 parse_prices.py --magnit
+        env:
+          PYTHONUNBUFFERED: "1"
+
+      - name: Show prices_live.json summary
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path("prices_live.json")
+          if not p.exists():
+              raise SystemExit("prices_live.json not created")
+          data = json.loads(p.read_text(encoding="utf-8"))
+          print("updated:", data.get("updated"))
+          print("sources:", data.get("sources"))
+          for store in ("Магнит", "Перекрёсток"):
+              block = data.get(store) or {}
+              print(f"{store}: {len(block)} items")
+          PY
+
+      - name: Commit and push prices_live.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add prices_live.json
+          if git diff --staged --quiet; then
+            echo "No price changes"
+            exit 0
+          fi
+          git commit -m "chore(prices): update prices_live.json [skip ci]"
+          git push
