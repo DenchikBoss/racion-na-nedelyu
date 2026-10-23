@@ -905,6 +905,10 @@ const FOOD_PHOTOS = {
 function dishPhoto(d) {
   if (!d) return FOOD_PHOTOS.default;
   if (d.img) return d.img;
+  // Prefer local image by dish id when present (img/dishes/{id}.jpg)
+  if (d.id != null && d.id !== "") {
+    return "img/dishes/" + d.id + ".jpg";
+  }
   const name = (d.name || "").toLowerCase();
   const tags = ((d.tags || []).join(" ") + " " + (d.meal || "")).toLowerCase();
   const s = name + " " + tags;
@@ -1466,7 +1470,8 @@ function save() {
     menu: state.menu,
     shopChecks: state.shopChecks,
     familyPortions: state.familyPortions,
-    cookPlan: state.cookPlan
+    cookPlan: state.cookPlan,
+    savedAt: Date.now()
   };
   _memStore = payload;
   try {
@@ -1476,18 +1481,47 @@ function save() {
 function load() {
   try {
     var raw = safeGet('ration_v2');
-    if (!raw && _memStore) {
-      Object.assign(state, _memStore);
-      return !!(state.menu && state.menu.length);
+    var data = null;
+    if (raw) {
+      data = JSON.parse(raw);
+    } else if (_memStore) {
+      data = _memStore;
     }
-    if (!raw) return false;
-    var data = JSON.parse(raw);
-    if (data.menu) {
-      Object.assign(state, data);
-      return true;
+    if (!data || !data.menu || !data.menu.length) return false;
+    if (data.quiz) state.quiz = data.quiz;
+    if (data.likes) state.likes = data.likes;
+    if (data.norms) state.norms = data.norms;
+    state.menu = data.menu;
+    state.shopChecks = data.shopChecks || {};
+    if (data.familyPortions != null) state.familyPortions = data.familyPortions;
+    if (data.cookPlan) state.cookPlan = data.cookPlan;
+    state.currentDay = 0;
+    return true;
+  } catch (e) {
+    console.warn('load failed', e);
+    return false;
+  }
+}
+
+/** Restore saved menu on app start. Returns true if menu screen shown. */
+function restoreSession() {
+  try {
+    if (!load()) return false;
+    if (!state.menu || !state.menu.length) return false;
+    try { renderMenu(); } catch (e) {
+      console.warn('renderMenu on restore failed', e);
+      return false;
     }
-  } catch (e) {}
-  return false;
+    showScreen('menu');
+    try {
+      var tip = document.querySelector('.ios-tip');
+      if (tip) tip.textContent = 'Восстановлено сохранённое меню. Можно открыть список покупок или начать заново.';
+    } catch (e2) {}
+    return true;
+  } catch (e) {
+    console.warn('restoreSession', e);
+    return false;
+  }
 }
 
 
@@ -4053,7 +4087,15 @@ on('swiperBack', function(){ showScreen('quiz'); });
       _memStore = null;
       state.quiz = {};
       state.likes = {};
+      state.history = [];
+      state.deck = [];
+      state.deckIdx = 0;
       state.menu = null;
+      state.norms = null;
+      state.shopChecks = {};
+      state.cookPlan = null;
+      state.taste = { tags: {}, cuisine: {}, protein: {}, meal: {}, sample: 0 };
+      state.currentDay = 0;
       showScreen('welcome');
     }
   });
@@ -4075,6 +4117,15 @@ on('swiperBack', function(){ showScreen('quiz'); });
     if (e.key === 'ArrowUp') swipe('super');
     if (e.key === 'z' && e.ctrlKey) undoSwipe();
   });
+
+  // Restore previous menu if user already built one
+  try {
+    if (restoreSession()) {
+      // Already on menu screen
+    }
+  } catch (eRest) {
+    console.warn(eRest);
+  }
 }
 
 function boot() {
@@ -4090,7 +4141,7 @@ function boot() {
     try {
       if (isTelegram()) {
         var tip = document.querySelector('.ios-tip');
-        if (tip) tip.textContent = 'Открыто в Telegram. Данные сохраняются на устройстве.';
+        if (tip) tip.textContent = 'Открыто в Telegram. Меню сохраняется на устройстве и откроется при следующем входе.';
         tgBackForScreen('welcome');
         try {
           tgMainButton('Собрать рацион', function() {
