@@ -1,5 +1,6 @@
-// Локальные фото: img/dishes/{id}.jpg
-// Никакой генерации и внешних CDN в рантайме.
+// Локальные фото блюд: img/dishes/{id}.jpg
+// Имена файлов = id блюда без ведущих нулей (1.jpg … 200.jpg).
+// Блюда без файла (201+) падают в default через onerror в photoHTML.
 
 function dishPhoto(d) {
   if (!d) return "img/library/default.jpg";
