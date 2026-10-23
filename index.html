@@ -26,7 +26,7 @@
     <div class="logo">🥗</div>
     <h1>Рацион на неделю</h1>
     <p>Собери меню под семью, бюджет и вкус — со списком покупок. Около 2 минут.</p>
-    <p class="ios-tip" style="font-size:.78rem;color:var(--text-muted);margin-top:10px;line-height:1.4">📱 Браузер, iPhone или Telegram. Цены подтягиваются из prices_live.json (Магнит / Впрок), кэш 12 ч.</p>
+    <p class="ios-tip" style="font-size:.78rem;color:var(--text-muted);margin-top:10px;line-height:1.4">📱 Браузер, iPhone или Telegram. Готовое меню сохраняется и откроется при следующем входе. Цены — из prices_live.json.</p>
     <div class="features">
       <div class="feature"><span class="icon">👨‍👩‍👧</span><span>Меню на всю семью с учётом порций</span></div>
       <div class="feature"><span class="icon">⚡</span><span>Короткий тест и свайп блюд</span></div>
@@ -123,30 +123,43 @@
     <h1>Список покупок</h1>
     <button class="theme-toggle" data-theme-btn aria-label="Тема">🌙</button>
   </header>
-  <div class="shop-total" id="shopTotal"></div>
-  <p class="price-note" id="priceNote" style="margin-bottom:12px"></p>
+  <div class="shop-summary" id="shopSummary"></div>
   <div id="shopList"></div>
-  <div class="footer-actions">
-    <button class="btn btn-primary btn-block" id="btnCopyShop">📋 Копировать список</button>
+  <div class="nav-bottom" style="flex-direction:column;gap:10px">
+    <button class="btn btn-primary btn-block" id="btnCopyShop">📋 Скопировать список</button>
     <button class="btn btn-secondary btn-block" id="btnDownloadShop">⬇️ Скачать .txt</button>
-    <button class="btn btn-secondary btn-block" id="btnPrintShop">🖨 Печать</button>
+    <button class="btn btn-ghost btn-block" id="btnPrintShop">🖨 Печать</button>
   </div>
 </section>
 
-<!-- REPLACE MODAL -->
-<div class="modal-overlay" id="replaceModal">
+<!-- MODALS -->
+<div class="modal-backdrop" id="replaceModal">
   <div class="modal">
-    <h3>Заменить блюдо</h3>
-    <div id="altList"></div>
-    <button class="btn btn-secondary btn-block" id="closeModal" style="margin-top:12px">Отмена</button>
+    <div class="modal-header">
+      <h3 id="modalTitle">Заменить блюдо</h3>
+      <button class="modal-close" id="closeModal" aria-label="Закрыть">×</button>
+    </div>
+    <div id="modalBody"></div>
   </div>
 </div>
 
-<div class="modal-overlay" id="recipeModal">
+<div class="modal-backdrop" id="recipeModal">
   <div class="modal">
+    <div class="modal-header">
+      <h3 id="recipeTitle">Рецепт</h3>
+      <button class="modal-close" id="closeRecipe" aria-label="Закрыть">×</button>
+    </div>
     <div id="recipeBody"></div>
-    <button class="btn btn-secondary btn-block" id="btnExportOneRecipe" style="margin-top:8px">⬇️ Скачать этот рецепт</button>
-    <button class="btn btn-primary btn-block" id="closeRecipe" style="margin-top:8px">Закрыть</button>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="textModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="textModalTitle">Текст</h3>
+      <button class="modal-close" id="closeTextModal" aria-label="Закрыть">×</button>
+    </div>
+    <pre id="textModalBody" style="white-space:pre-wrap;font-size:.9rem;max-height:60vh;overflow:auto"></pre>
   </div>
 </div>
 
