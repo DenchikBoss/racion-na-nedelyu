@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-25T17:00:11",
+  "updated": "2026-10-25T23:03:52",
   "sources": {
     "Магнит": "https://magnit.ru/webgate/v2/goods/search"
   },
@@ -24,7 +24,6 @@
     "carrot": 26.39,
     "cabbage": 25.99,
     "broccoli": 349.95,
-    "zucchini": 189.99,
     "cucumber": 89.99,
     "tomato": 139.99,
     "onion": 36.99,
