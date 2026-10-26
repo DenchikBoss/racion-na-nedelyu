@@ -1,11 +1,11 @@
 {
-  "updated": "2026-10-25T23:03:52",
+  "updated": "2026-10-26T10:50:01",
   "sources": {
     "Магнит": "https://magnit.ru/webgate/v2/goods/search"
   },
   "Магнит": {
     "chicken_breast": 387.49,
-    "turkey": 599.98,
+    "turkey": 499.99,
     "beef": 388.86,
     "fish_white": 299.99,
     "salmon": 1799.99,
@@ -38,7 +38,7 @@
     "lentils": 224.97,
     "beans": 194.42,
     "bread": 45.8,
-    "cheese": 689.9,
+    "cheese": 729.9,
     "hummus": 749.95
   }
 }
