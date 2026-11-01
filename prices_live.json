@@ -1,7 +1,41 @@
 {
-  "updated": "2026-11-01T11:44:11",
+  "updated": "2026-11-01T21:46:12",
   "sources": {
     "Магнит": "https://magnit.ru/webgate/v2/goods/search"
   },
-  "Магнит": {}
+  "Магнит": {
+    "turkey": 622.21,
+    "fish_white": 299.99,
+    "salmon": 919.98,
+    "eggs": 96.99,
+    "cottage": 366.61,
+    "kefir": 99.99,
+    "milk": 102.14,
+    "yogurt": 218.69,
+    "oats": 132.47,
+    "buckwheat": 81.24,
+    "rice": 124.99,
+    "bulgur": 177.76,
+    "pasta": 54.97,
+    "quinoa": 355.53,
+    "potato": 44.99,
+    "carrot": 25.69,
+    "cabbage": 26.99,
+    "broccoli": 299.99,
+    "zucchini": 199.99,
+    "cucumber": 89.99,
+    "tomato": 199.99,
+    "onion": 34.99,
+    "greens": 799.93,
+    "apple": 67.89,
+    "nuts": 1153.77,
+    "oil": 139.99,
+    "tofu": 599.9,
+    "chickpeas": 149.97,
+    "lentils": 266.64,
+    "beans": 199.98,
+    "bread": 139.98,
+    "cheese": 833.28,
+    "hummus": 549.9
+  }
 }

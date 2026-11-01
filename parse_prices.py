@@ -41,6 +41,7 @@ import argparse
 import json
 import os
 import re
+import sys
 import time
 import urllib.error
 import urllib.parse
@@ -75,7 +76,7 @@ PRODUCTS = {
     "tomato": ("помидоры", ["помидор", "томат"], "kg", 1),
     "onion": ("лук репчатый", ["лук"], "kg", 1),
     "greens": ("укроп", ["укроп", "петрушк"], "pack", 1),
-    "apple": ("яблоки", ["яблок"], "kg", 1),
+    "apple": ("яблоки голден", ["яблок"], "kg", 1),
     "banana": ("бананы", ["банан"], "kg", 1),
     "berries": ("ягоды", ["ягод", "клубник"], "kg", 0.3),
     "nuts": ("грецкий орех", ["грецк", "миндал"], "kg", 0.1),
@@ -93,6 +94,72 @@ SKIP = re.compile(
     r"игруш|книг|пакет|сок |пюре |магги|плавлен|нектар|соломка|икра |напиток овсян",
     re.I,
 )
+
+# Что считать нужным товаром: начало названия, исключения, допустимая цена за единицу.
+# Без этого самым дешёвым «совпадением» оказывалась ветчина вместо куриной грудки
+# или наполнитель для лотка вместо тофу.
+PRODUCT_RULES = {
+    "chicken_breast": (r"^(филе|грудк|куриное филе|куриная грудка|филе грудки)", r"ветчин|колбас|котлет|наггетс|копч|фарш|бульон|паштет|индейк|салат|в панировке", 200, 800),
+    "turkey": (r"^(филе|грудк|индейк)", r"котлет|колбас|ветчин|фарш|копч|бульон|паштет|сосиск|куриц|цыпл|соус|гриле|обжарен", 300, 1100),
+    "beef": (r"^(говядин|вырезка|лопатка|мякоть|гуляш).*", r"мраморн|котлет|свинин|туш[её]н|консерв|фарш|колбас|корм|бульон|пельмен|паштет|куриц|сосиск", 350, 1800),
+    "fish_white": (r"^(минтай|филе минтая)", r"консерв|котлет|палоч|икр|фарш|в кляре", 150, 800),
+    "salmon": (r"^(стейк |филе )?(горбуш|лосос|семг|сёмг)", r"консерв|копч|икр|паштет|салат|слабосол", 400, 2800),
+    "eggs": (r"^(куриное )?яйц", r"перепел|шоколад", 50, 300),
+    "cottage": (r"^творог", r"клубник|ягод|ванил|растишк|сырок|детск|десерт|персик|абрикос|паста|банан|шоколад|изюм", 150, 1000),
+    "kefir": (r"^кефир", r"детск", 40, 250),
+    "milk": (r"^молоко", r"сгущ|кокос|овся|миндал|соев|детск|шоколад|сух|банан|клубник", 50, 250),
+    "yogurt": (r"^йогурт", r"питьев|клубник|персик|вишн|черник|шоколад|банан|малин|злаки|детск", 100, 800),
+    "oats": (r"^(овсян|хлопья .*(геркулес|овсян)|геркулес)", r"печень|батонч|напит|быстрого|кисел|каша .*(яблок|ягод)", 30, 350),
+    "buckwheat": (r"^(крупа )?гречн|^гречк", r"лапш|хлопья|каша с|хлебц", 30, 300),
+    "rice": (r"^(крупа )?рис", r"уксус|лапш|бумаг|хлопья|каша с|хлебц|смесь", 30, 350),
+    "bulgur": (r"^(крупа )?булгур", r"смесь", 70, 500),
+    "pasta": (r"^(макарон|спагетти|рожки|перья|паста)", r"сыр|соус|быстрого|лапша б", 30, 400),
+    "quinoa": (r"^(крупа )?киноа", r"смесь|хлебц", 150, 1200),
+    "potato": (r"^картофель", r"чипс|пюре|фри|замор|дольк|по-деревенск", 15, 150),
+    "carrot": (r"^морковь", r"корейск|замор|сок", 15, 150),
+    "cabbage": (r"^капуста белокоч", r"квашен|тушен|салат", 15, 150),
+    "broccoli": (r"^(капуста )?брокколи", r"суп|смесь", 100, 900),
+    "zucchini": (r"^(кабач|цукини)", r"икра|консерв|оладь|чипс", 40, 500),
+    "cucumber": (r"^огур", r"сол[её]н|марин|консерв|корнишон|салат", 30, 500),
+    "tomato": (r"^(помидор|томат)", r"марин|консерв|паста|соус|сок|сушен|вял|кетчуп|в собственн|целые|резан|кубик|протерт", 60, 800),
+    "onion": (r"^лук репч", r"жарен|суш", 15, 150),
+    "greens": (r"^(укроп|петрушк|зелень)", r"бульон|суш|приправ", 300, 4000),
+    "apple": (r"^яблок", r"напит|сок|пюре|чипс|суш|пастил", 40, 400),
+    "banana": (r"^банан", r"напит|коктейл|чипс|йогурт|пюре|суш", 60, 350),
+    "berries": (r"^(клубник|малин|черник|смородин|ягод|ассорти ягод)", r"варень|джем|йогурт|напит|морожен|конфет|кисел|сироп", 150, 1000),
+    "nuts": (r"^(орех|грецк)", r"шоколад|печень|в глазури|скорлуп", 300, 3000),
+    "oil": (r"^масло подсолн", r"спрей", 60, 350),
+    "tofu": (r"^(тофу|сыр тофу)", r"наполнит|лот|кошач", 100, 1000),
+    "chickpeas": (r"^нут", r"консерв|хумус|чипс", 80, 500),
+    "lentils": (r"^чечевиц", r"консерв|суп", 80, 500),
+    "beans": (r"^фасоль", r"стручк|замор|томатн|соус", 60, 500),
+    "bread": (r"^хлеб", r"хлебц|сухар|тостов.*чипс", 30, 400),
+    "cheese": (r"^сыр", r"плавлен|творож|колбас|снек|закуск|тертый|т[её]ртый|с плесен|сырок", 400, 1800),
+    "hummus": (r"^хумус", r"чипс", 250, 2000),
+}
+
+# Меньше этого числа цен — считаем сбор неудачным и не трогаем prices_live.json
+MIN_LIVE_PRICES = 20
+
+
+def valid_product(key: str, name: str, price_per_unit: float) -> bool:
+    """Подходит ли товар к позиции: по названию и по разумной цене."""
+    rule = PRODUCT_RULES.get(key)
+    if not rule:
+        return True
+    start, ban, low, high = rule
+    n = name.lower().replace("ё", "е")
+    if not re.search(start.replace("ё", "е"), n):
+        return False
+    if re.search(ban.replace("ё", "е"), n):
+        return False
+    return low <= price_per_unit <= high
+
+
+def typical_price(values: list) -> Any:
+    """Нижняя четверть цен: недорогой обычный товар, а не разовая акция и не премиум."""
+    return values[(len(values) - 1) // 4]
+
 
 # Перекрёсток обычно дороже Магнита на ~8–15%
 PK_FALLBACK_MULT = 1.12
@@ -212,14 +279,16 @@ def setup_pk_opener(proxy_url: Optional[str] = None) -> None:
 # МАГНИТ
 # ═══════════════════════════════════════════════════════════════
 MAGNIT_STORE = "992301"
+MAGNIT_MAX_PAGES = 5
+MAGNIT_ENOUGH_ITEMS = 6
 MAGNIT_URL = "https://magnit.ru/webgate/v2/goods/search"
 
 
-def magnit_search(term: str) -> dict:
+def magnit_search(term: str, offset: int = 0) -> dict:
     body = json.dumps(
         {
             "term": term,
-            "pagination": {"limit": 20, "offset": 0},
+            "pagination": {"limit": 20, "offset": offset},
             "sort": {"order": "asc", "type": "price"},
             "storeCode": MAGNIT_STORE,
             "storeType": "1",
@@ -247,27 +316,34 @@ def parse_magnit() -> dict:
     results = {}
     for key, (q, must, unit, default_w) in PRODUCTS.items():
         try:
-            items = magnit_search(q).get("items") or []
             scored = []
-            for it in items:
-                price = it.get("price")
-                if not price:
-                    continue
-                name = it.get("name") or ""
-                if SKIP.search(name):
-                    continue
-                if not any(m in name.lower() for m in must):
-                    continue
-                rub = price / 100.0
-                w = it.get("weighted") or {}
-                if w.get("unitPrice"):
-                    per = w["unitPrice"] / 100.0
-                else:
-                    per = normalize_price(rub, name, default_w)
-                scored.append((per, name, rub, it.get("id")))
+            # Сортировка по цене: первыми идут самые дешёвые товары, обычно не те, что нужны
+            for page in range(MAGNIT_MAX_PAGES):
+                items = magnit_search(q, page * 20).get("items") or []
+                for it in items:
+                    price = it.get("price")
+                    if not price:
+                        continue
+                    name = it.get("name") or ""
+                    if SKIP.search(name):
+                        continue
+                    if not any(m in name.lower() for m in must):
+                        continue
+                    rub = price / 100.0
+                    w = it.get("weighted") or {}
+                    if w.get("unitPrice"):
+                        per = w["unitPrice"] / 100.0
+                    else:
+                        per = normalize_price(rub, name, default_w)
+                    if not valid_product(key, name, per):
+                        continue
+                    scored.append((per, name, rub, it.get("id")))
+                if len(items) < 20 or len(scored) >= MAGNIT_ENOUGH_ITEMS:
+                    break
+                time.sleep(0.35)
             scored.sort(key=lambda x: x[0])
             if scored:
-                per, name, pack, pid = scored[0]
+                per, name, pack, pid = typical_price(scored)
                 results[key] = {
                     "name": name,
                     "price_rub": round(per, 2),
@@ -470,11 +546,13 @@ def parse_perekrestok(magnit_results: Optional[dict] = None) -> dict:
                 if not any(m in name.lower() for m in must):
                     continue
                 per = normalize_price(price, name, default_w)
+                if not valid_product(key, name, per):
+                    continue
                 scored.append((per, name, price, pid))
 
             scored.sort(key=lambda x: x[0])
             if scored:
-                per, name, pack, pid = scored[0]
+                per, name, pack, pid = typical_price(scored)
                 results[key] = {
                     "name": name,
                     "price_rub": round(per, 2),
@@ -573,6 +651,15 @@ def main():
         pk_res = parse_perekrestok(magnit_res)
         with open("perekrestok_prices_raw.json", "w", encoding="utf-8") as f:
             json.dump(pk_res, f, ensure_ascii=False, indent=2)
+
+    # Пустой или почти пустой сбор не должен затирать рабочие цены и выглядеть успехом
+    collected = max(
+        sum(1 for v in magnit_res.values() if v),
+        sum(1 for v in pk_res.values() if v),
+    )
+    if collected < MIN_LIVE_PRICES:
+        print(f"ОШИБКА: собрано {collected} цен, нужно минимум {MIN_LIVE_PRICES}. prices_live.json не изменён.")
+        sys.exit(1)
 
     app = {
         "updated": datetime.now().isoformat(timespec="seconds"),
