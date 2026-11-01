@@ -235,6 +235,25 @@ const EXTRA_DISHES = [
 const REMOVED_DISH_TWIN = {63:199,73:10,75:5,79:19,80:22,81:25,83:24,84:28,85:213,86:54,95:217,96:66,100:57,103:42,104:61,106:7,118:50,131:17,172:47,180:51,181:67,183:45};
 EXTRA_DISHES.forEach(d => { if (!d.cuisine) d.cuisine = "мировая"; DISHES.push(d); });
 
+// Кухня базовых блюд (остальные — «домашняя», без выраженной кухни)
+const BASE_DISH_CUISINE = {
+  "русская": [2,5,7,10,13,14,19,24,25,27,30,34,50,56,59,64,69,70,76,90,93,108,114,115,119,121,128,133,141,143,149,162,163,191,192,198,199],
+  "итальянская": [26,82,101,102,127,139,146,168,194],
+  "греческая": [61,94,104,153],
+  "французская": [145,164],
+  "грузинская": [105],
+  "узбекская": [22,135],
+  "ближний восток": [47,78,98,122,166,185],
+  "индийская": [58,144],
+  "японская": [42],
+  "китайская": [150,158],
+  "мексиканская": [68],
+  "американская": [28]
+};
+Object.entries(BASE_DISH_CUISINE).forEach(([cuisine, ids]) => {
+  ids.forEach(id => { const d = DISHES.find(x => x.id === id); if (d) d.cuisine = cuisine; });
+});
+
 const NUTR_PER_100 = {
   "авокадо":[160,2.0,15.0,9.0],
   "апельсин":[47,0.9,0.1,12.0],
@@ -1202,7 +1221,7 @@ const state = {
   familyPortions: 1, // multiplier for display/shopping
   replaceCtx: null,
   // Adaptive swiper taste vector (updated on each swipe)
-  taste: { tags: {}, cuisine: {}, protein: {}, meal: {}, sample: 0 }
+  taste: null
 };
 
 // ===================== UTILS =====================
@@ -1341,6 +1360,7 @@ function save() {
   var payload = {
     quiz: state.quiz,
     likes: state.likes,
+    taste: state.taste,
     norms: state.norms,
     menu: state.menu,
     shopChecks: state.shopChecks,
@@ -1365,6 +1385,7 @@ function load() {
     if (!data || !data.menu || !data.menu.length) return false;
     if (data.quiz) state.quiz = data.quiz;
     if (data.likes) state.likes = data.likes;
+    state.taste = (data.taste && data.taste.v === TASTE_VERSION) ? data.taste : tasteFromLikes(state.likes);
     if (data.norms) state.norms = data.norms;
     state.menu = data.menu.map(function(day) {
       // Блюда в сохранённом меню — копии; берём актуальные данные, удалённые дубли → близнец
@@ -2544,111 +2565,355 @@ function filterDishes() {
 }
 
 function proteinKey(d) {
-  const s = (d.name + ' ' + (d.tags || []).join(' ')).toLowerCase();
-  if (/лос[оа]с|треск|рыб|тунц|семг/.test(s)) return 'рыба';
-  if (/кревет|морепродукт/.test(s)) return 'морепродукты';
-  if (/говяд|бефстроган|гуляш/.test(s)) return 'говядина';
-  if (/свин|бекон|колбас/.test(s)) return 'свинина';
-  if (/индейк/.test(s)) return 'индейка';
-  if (/куриц|грудк|крыл/.test(s)) return 'курица';
-  if (/фарш/.test(s)) return 'фарш';
-  if (/тофу|нут|чечевиц|фасол|бобов/.test(s)) return 'бобовые';
-  if (/яйц|омлет|яичниц/.test(s)) return 'яйца';
-  if (/творог|сырник|сыр\b/.test(s)) return 'молочное';
-  return 'другое';
+  const norm = s => s.toLowerCase().replace(/ё/g, 'е');
+  const ings = norm((d.ingredients || []).map(i => i.n).join(' '));
+  const byText = s => {
+    if (/лос[оа]с|треск|рыб|тунц|тунец|семг|минтай|горбуш|сельд|форел/.test(s)) return 'рыба';
+    if (/кревет|морепродукт|кальмар|миди/.test(s)) return 'морепродукты';
+    if (/говяд|бефстроган|гуляш/.test(s)) return 'говядина';
+    if (/свин|бекон|колбас|сосиск/.test(s)) return 'свинина';
+    if (/индейк/.test(s)) return 'индейка';
+    if (/куриц|курин|грудк|крыл/.test(s)) return 'курица';
+    if (/фарш/.test(s)) return 'фарш';
+    if (/тофу|нут|чечевиц|фасол|бобов|хумус/.test(s)) return 'бобовые';
+    if (/яйц|омлет|яичниц|шакшук/.test(s)) return 'яйца';
+    if (/творог|творож|сырник|сыр|запеканк/.test(s)) return 'молочное';
+    return 'другое';
+  };
+  let key = byText(norm(d.name + ' ' + (d.tags || []).join(' ')));
+  if (key === 'другое') key = byText(ings);
+  if (key === 'фарш') {
+    if (/куриц|курин/.test(ings)) return 'курица';
+    if (/рыб/.test(ings)) return 'рыба';
+    return 'говядина';
+  }
+  return key;
 }
 
 function dishCuisine(d) {
-  return d.cuisine || (d.tags || []).find(t => /ская|ский|русск|итальян|грузин|азиат|япон|китай|коре|тайск|индий|мексик|франц|гречес|узбек/.test(t)) || 'мировая';
+  return d.cuisine || (d.tags || []).find(t => /ская|ский|русск|итальян|грузин|азиат|япон|китай|коре|тайск|индий|мексик|франц|гречес|узбек/.test(t)) || 'домашняя';
 }
 
-function bumpTaste(map, key, delta) {
-  if (!key) return;
-  map[key] = (map[key] || 0) + delta;
+const CUISINE_FAMILY = {
+  'русская': 'русская', 'украинская': 'русская', 'белорусская': 'русская',
+  'грузинская': 'кавказ и восток', 'узбекская': 'кавказ и восток', 'ближний восток': 'кавказ и восток',
+  'итальянская': 'средиземноморская', 'французская': 'средиземноморская', 'греческая': 'средиземноморская', 'испанская': 'средиземноморская',
+  'китайская': 'азиатская', 'японская': 'азиатская', 'корейская': 'азиатская', 'тайская': 'азиатская', 'индийская': 'азиатская',
+  'мексиканская': 'американская', 'американская': 'американская'
+};
+function cuisineFamily(d) {
+  return CUISINE_FAMILY[dishCuisine(d)] || 'домашняя';
 }
 
-function updateTasteFromDish(d, val) {
-  if (!state.taste) state.taste = { tags: {}, cuisine: {}, protein: {}, meal: {}, sample: 0 };
+function dishFormat(d) {
+  const s = (d.name + ' ' + (d.tags || []).join(' ')).toLowerCase().replace(/ё/g, 'е');
+  if (/суп|борщ|(^|\s)щи(\s|$)|рассольник|солянк|(^|\s)уха(\s|$)|харчо|шурпа|лагман|окрошк|бульон|том ям|^дал /.test(s)) return 'суп';
+  if (/салат|винегрет|оливье/.test(s)) return 'салат';
+  if (/смузи|кефир|протеин|орех|миндал|арахисов|хумус|гуакамоле|батончик|галет/.test(s)) return 'перекус';
+  if (/блин|оладь|сырник|драник|хачапури|запеканк|чизкейк/.test(s)) return 'выпечка';
+  if (/овсяноблин/.test(s)) return 'выпечка';
+  if (/каш|овсянк|гранол/.test(s)) return 'каша';
+  if (/творог|творож|йогурт|яблок|банан|огурец с/.test(s)) return 'перекус';
+  if (/паст[аыо]|макарон|спагетти|лапш|лазань|пельмен|вареник|карбонар|болоньез|пад тай/.test(s)) return 'паста';
+  if (/тост|бутерброд|сэндвич|шаурм|тако|кесадиль|хлеб/.test(s)) return 'бутерброд';
+  return 'горячее';
+}
+
+// ===== Профиль вкуса: по каждому значению оси копим «за» и «против» =====
+const TASTE_VERSION = 2;
+const TASTE_WEIGHTS = { protein: 0.35, family: 0.25, format: 0.2, tags: 0.2 };
+const TASTE_SCALE = 120; // переводит предпочтение (-1…1) в баллы, сравнимые с бонусами меню
+const STYLE_TAGS = ['острое', 'сладкое', 'лёгкое', 'жареное', 'запечённое', 'тушёное', 'холодное', 'овощи', 'быстро'];
+const GENERIC_VALUES = { protein: 'другое', family: 'домашняя', format: 'горячее' };
+
+function newTaste() {
+  return { v: TASTE_VERSION, protein: {}, family: {}, format: {}, tags: {}, muted: {}, sample: 0 };
+}
+
+function dishTasteValues(d) {
+  return {
+    protein: [proteinKey(d)],
+    family: [cuisineFamily(d)],
+    format: [dishFormat(d)],
+    tags: (d.tags || []).filter(t => STYLE_TAGS.includes(t))
+  };
+}
+
+/** val: -1 нет, 1 да, 2 очень. sign = -1 откатывает оценку (отмена свайпа). */
+function updateTasteFromDish(d, val, sign) {
+  if (!state.taste || state.taste.v !== TASTE_VERSION) state.taste = newTaste();
   const t = state.taste;
-  t.sample = (t.sample || 0) + 1;
-  const w = val; // -1 no, 1 yes, 2 super
-  (d.tags || []).forEach(tag => bumpTaste(t.tags, tag, w));
-  bumpTaste(t.cuisine, dishCuisine(d), w * 1.4);
-  bumpTaste(t.protein, proteinKey(d), w * 1.3);
-  bumpTaste(t.meal, d.meal, w * 0.6);
+  const dir = sign === -1 ? -1 : 1;
+  t.sample = Math.max(0, t.sample + dir);
+  const values = dishTasteValues(d);
+  Object.keys(values).forEach(axis => {
+    values[axis].forEach(key => {
+      const st = t[axis][key] || (t[axis][key] = { pos: 0, neg: 0 });
+      if (val > 0) st.pos = Math.max(0, st.pos + dir * val);
+      else st.neg = Math.max(0, st.neg + dir * -val);
+      if (!st.pos && !st.neg) delete t[axis][key];
+    });
+  });
 }
 
-function tasteScore(d) {
-  if (!state.taste || !state.taste.sample) return Math.random() * 4;
+function tasteFromLikes(likes) {
+  const saved = state.taste;
+  state.taste = newTaste();
+  Object.entries(likes || {}).forEach(([id, val]) => {
+    const d = DISHES.find(x => x.id == (REMOVED_DISH_TWIN[id] || id));
+    if (d && val) updateTasteFromDish(d, val);
+  });
+  const rebuilt = state.taste;
+  state.taste = saved;
+  return rebuilt;
+}
+
+function tasteCount(axis, key) {
+  const st = state.taste && state.taste[axis] && state.taste[axis][key];
+  return st ? st.pos + st.neg : 0;
+}
+
+/** Предпочтение от -1 до 1; мало оценок → ближе к нулю. */
+function tastePref(axis, key) {
   const t = state.taste;
+  if (!t || !t[axis] || (t.muted && t.muted[axis + ':' + key])) return 0;
+  const st = t[axis][key];
+  if (!st) return 0;
+  return (st.pos - st.neg) / (st.pos + st.neg + 1.5);
+}
+
+function tasteMatch(d) {
+  const values = dishTasteValues(d);
   let s = 0;
-  (d.tags || []).forEach(tag => { s += (t.tags[tag] || 0) * 0.9; });
-  s += (t.cuisine[dishCuisine(d)] || 0) * 1.6;
-  s += (t.protein[proteinKey(d)] || 0) * 1.4;
-  s += (t.meal[d.meal] || 0) * 0.5;
-  // explore: slight noise so deck is not stuck
-  s += (Math.random() - 0.5) * 2.5;
+  ['protein', 'family', 'format'].forEach(axis => { s += TASTE_WEIGHTS[axis] * tastePref(axis, values[axis][0]); });
+  if (values.tags.length) {
+    s += TASTE_WEIGHTS.tags * values.tags.reduce((sum, tag) => sum + tastePref('tags', tag), 0) / values.tags.length;
+  }
   return s;
 }
 
-function buildDeck() {
-  const filtered = filterDishes();
-  // Rank by current taste (empty at start → mild random)
-  const ranked = filtered.slice().sort((a, b) => tasteScore(b) - tasteScore(a));
-  const byMeal = {завтрак:[], обед:[], ужин:[], перекус:[]};
-  ranked.forEach(d => { if (byMeal[d.meal]) byMeal[d.meal].push(d); });
-
-  // Interleave meals but keep taste order within each meal
-  let deck = [];
-  const maxLen = Math.max(...Object.values(byMeal).map(a => a.length), 1);
-  for (let i = 0; i < maxLen; i++) {
-    ['завтрак','обед','ужин','перекус'].forEach(m => {
-      if (byMeal[m][i]) deck.push(byMeal[m][i]);
-    });
-  }
-  // First cards: more exploration diversity; later: stronger preference
-  state.deck = deck.slice(0, 24);
-  state.deckIdx = 0;
-  state.history = [];
+function tasteScore(d) {
+  if (!state.taste || !state.taste.sample) return 0;
+  return tasteMatch(d) * TASTE_SCALE;
 }
 
-/** After a swipe, reorder the *remaining* deck toward current taste */
-function adaptDeckAfterSwipe() {
-  if (!state.deck || state.deckIdx >= state.deck.length - 1) return;
-  if (!state.taste || state.taste.sample < 2) return; // need a couple signals
-  const head = state.deck.slice(0, state.deckIdx + 1);
-  const rest = state.deck.slice(state.deckIdx + 1);
-  // Keep meal variety: re-sort rest by taste but soft-cap same cuisine streak
-  rest.sort((a, b) => tasteScore(b) - tasteScore(a));
-  const out = [];
-  let lastCui = head.length ? dishCuisine(head[head.length - 1]) : '';
-  const pool = rest.slice();
-  while (pool.length) {
-    let idx = 0;
-    // Prefer not repeating same cuisine 3+ times in a row when alternatives exist
-    for (let i = 0; i < pool.length; i++) {
-      const c = dishCuisine(pool[i]);
-      if (c !== lastCui || pool.length < 3) { idx = i; break; }
+// ===== Колода: следующая карточка выбирается после каждого свайпа =====
+const SWIPE_EXPLORE = 8;      // первые карточки только изучают вкус
+const SWIPE_MIN = 12;         // раньше не останавливаемся
+const SWIPE_MAX = 20;
+const SWIPE_EXTRA = 6;        // «уточнить ещё»
+const SWIPE_CONFIDENCE = 0.7; // насколько ясно отношение к подходящим блюдам
+const INFO_WEIGHTS = { protein: 0.5, family: 0.25, format: 0.25 };
+
+function activeMeals() {
+  const meals = ['завтрак', 'обед', 'ужин'];
+  if (!state.norms || +state.norms.meals !== 3) meals.push('перекус');
+  return meals;
+}
+
+function buildDeck() {
+  const meals = activeMeals();
+  const allowed = filterDishes();
+  const inMeals = allowed.filter(d => meals.includes(d.meal));
+  // Мало блюд на эти приёмы — меню возьмёт и другие, значит и спрашивать надо про них
+  state.deckPool = inMeals.length >= SWIPE_MIN ? inMeals : allowed;
+  state.jitter = {};
+  DISHES.forEach(d => { state.jitter[d.id] = Math.random(); });
+  state.poolShare = { protein: {}, family: {}, format: {} };
+  state.deckPool.forEach(d => {
+    const values = dishTasteValues(d);
+    Object.keys(state.poolShare).forEach(axis => {
+      const share = state.poolShare[axis];
+      share[values[axis][0]] = (share[values[axis][0]] || 0) + 1 / state.deckPool.length;
+    });
+  });
+  // Новый проход — с чистого листа (в том числе после возврата к опросу)
+  state.likes = {};
+  state.taste = newTaste();
+  state.swipeMin = SWIPE_MIN;
+  state.swipeMax = SWIPE_MAX;
+  state.swipeLock = false;
+  state.deck = [];
+  state.deckIdx = 0;
+  state.history = [];
+  const first = pickNextCard();
+  if (first) state.deck.push(first);
+}
+
+/** Сколько узнаем из оценки блюда: неизученные и частые в пуле значения ценнее. */
+function cardInfo(d) {
+  const values = dishTasteValues(d);
+  let info = 0;
+  Object.keys(state.poolShare).forEach(axis => {
+    const key = values[axis][0];
+    const generic = GENERIC_VALUES[axis] === key ? 0.3 : 1;
+    const count = tasteCount(axis, key);
+    let boost = 1;
+    if (count === 0) boost = 1.5; // редкий, но ещё не показанный белок важнее повтора частого
+    else if (axis === 'protein' && count === 1 && tastePref(axis, key) < 0) boost = 4; // проверяем единичный отказ
+    info += INFO_WEIGHTS[axis] * generic * boost * Math.sqrt(state.poolShare[axis][key] || 0) / (1 + count);
+  });
+  return info;
+}
+
+function pickNextCard() {
+  const shown = {};
+  state.deck.forEach(d => { shown[d.id] = true; });
+  const pool = (state.deckPool || []).filter(d => !shown[d.id]);
+  if (!pool.length) return null;
+
+  // Приёмы пищи показываем поровну: меню нужны оценки по каждому
+  const seen = {};
+  state.deck.forEach(d => { seen[d.meal] = (seen[d.meal] || 0) + 1; });
+  const minSeen = Math.min(...pool.map(d => seen[d.meal] || 0));
+  const byMeal = pool.filter(d => (seen[d.meal] || 0) === minSeen);
+
+  // Один белок не должен занимать колоду: не больше двух подряд и четверти карточек
+  const n = state.deck.length;
+  const last = state.deck[n - 1];
+  const proteinSeen = {};
+  state.deck.forEach(d => { const p = proteinKey(d); proteinSeen[p] = (proteinSeen[p] || 0) + 1; });
+  const lastTwo = state.deck.slice(-2).map(proteinKey);
+  const streak = lastTwo.length === 2 && lastTwo[0] === lastTwo[1] ? lastTwo[0] : null;
+  const limit = Math.max(3, Math.ceil(n * 0.25));
+  const varied = list => list.filter(d => {
+    const p = proteinKey(d);
+    return p !== streak && (proteinSeen[p] || 0) < limit;
+  });
+  const candidates = [varied(byMeal), varied(pool), byMeal].find(list => list.length);
+
+  // Сначала изучаем, потом через одну: проверка гипотезы о вкусе и новая ось
+  const exploit = n >= SWIPE_EXPLORE && n % 2 === 0;
+  let best = null, bestScore = -Infinity;
+  candidates.forEach(d => {
+    let s = exploit ? cardInfo(d) * 0.4 + tasteMatch(d) : cardInfo(d);
+    if (last) {
+      if (proteinKey(d) === proteinKey(last)) s -= 0.06;
+      if (cuisineFamily(d) === cuisineFamily(last)) s -= 0.04;
+      if (dishFormat(d) === dishFormat(last)) s -= 0.04;
     }
-    const pick = pool.splice(idx, 1)[0];
-    out.push(pick);
-    lastCui = dishCuisine(pick);
-  }
-  state.deck = head.concat(out);
+    s += (state.jitter[d.id] || 0) * 0.03;
+    if (s > bestScore) { bestScore = s; best = d; }
+  });
+  return best;
+}
+
+/** Ясность значения: 3+ оценки и единое мнение → 1, разнобой → вдвое меньше. */
+function valueCertainty(axis, key) {
+  const st = state.taste && state.taste[axis] && state.taste[axis][key];
+  if (!st) return 0;
+  const n = st.pos + st.neg;
+  if (!n) return 0;
+  return Math.min(1, n / 3) * (0.5 + 0.5 * Math.abs(st.pos - st.neg) / n);
+}
+
+/** Насколько ясно отношение к подходящим блюдам (0…1). */
+function tasteConfidence() {
+  if (!state.poolShare) return 0;
+  const axes = Object.keys(state.poolShare);
+  const total = axes.reduce((sum, axis) => {
+    let covered = 0, weight = 0;
+    Object.entries(state.poolShare[axis]).forEach(([key, share]) => {
+      if (GENERIC_VALUES[axis] === key) return;
+      weight += share;
+      covered += share * valueCertainty(axis, key);
+    });
+    return sum + (weight ? covered / weight : 1);
+  }, 0);
+  return total / axes.length;
+}
+
+function swipingEnough() {
+  const rated = state.deckIdx;
+  if (rated >= state.swipeMax) return true;
+  if (rated < state.swipeMin) return false;
+  return tasteConfidence() >= SWIPE_CONFIDENCE;
+}
+
+// ===== «Вот что я про вас понял» =====
+const INSIGHT_LABELS = {
+  protein: { 'рыба': 'рыба', 'морепродукты': 'морепродукты', 'говядина': 'говядина', 'свинина': 'свинина', 'индейка': 'индейка', 'курица': 'курица', 'бобовые': 'бобовые', 'яйца': 'блюда из яиц', 'молочное': 'творог и сыр' },
+  family: { 'русская': 'русская кухня', 'кавказ и восток': 'Кавказ и Восток', 'средиземноморская': 'Средиземноморье', 'азиатская': 'азиатская кухня', 'американская': 'Америка и Мексика' },
+  format: { 'суп': 'супы', 'салат': 'салаты', 'каша': 'каши', 'выпечка': 'блины и выпечка', 'паста': 'паста и лапша', 'бутерброд': 'тосты и сэндвичи', 'перекус': 'лёгкие перекусы' },
+  tags: { 'острое': 'острое', 'сладкое': 'сладкое', 'лёгкое': 'лёгкие блюда', 'жареное': 'жареное', 'запечённое': 'запечённое', 'тушёное': 'тушёное', 'холодное': 'холодные блюда', 'овощи': 'овощи', 'быстро': 'быстрые блюда' }
+};
+const INSIGHT_THRESHOLD = 0.3;
+
+function tasteInsights() {
+  const items = [];
+  Object.keys(INSIGHT_LABELS).forEach(axis => {
+    Object.keys(INSIGHT_LABELS[axis]).forEach(key => {
+      const pref = tastePref(axis, key);
+      if (tasteCount(axis, key) >= 2 && Math.abs(pref) >= INSIGHT_THRESHOLD) {
+        items.push({ axis, key, pref, label: INSIGHT_LABELS[axis][key] });
+      }
+    });
+  });
+  items.sort((a, b) => Math.abs(b.pref) - Math.abs(a.pref));
+  return {
+    love: items.filter(i => i.pref > 0).slice(0, 6),
+    avoid: items.filter(i => i.pref < 0).slice(0, 6)
+  };
+}
+
+function renderInsights() {
+  const { love, avoid } = tasteInsights();
+  const chips = (list, cls) => list.map(i =>
+    `<button type="button" class="insight-chip ${cls}" data-axis="${i.axis}" data-key="${i.key}" aria-label="Убрать: ${i.label}">${i.label}<span aria-hidden="true">✕</span></button>`).join('');
+  const block = (title, list, cls) => list.length
+    ? `<div class="insight-group"><h4>${title}</h4><div class="insight-chips">${chips(list, cls)}</div></div>` : '';
+  const box = $('#insightList');
+  box.innerHTML = (love.length || avoid.length)
+    ? block('Вам нравится', love, 'love') + block('Лучше пореже', avoid, 'avoid')
+    : '<p class="empty">Явных предпочтений нет — соберём разнообразное меню.</p>';
+  const rated = state.deckIdx;
+  const ratedText = rated % 10 === 1 && rated % 100 !== 11 ? `${rated} оценке` : `${rated} оценкам`;
+  $('#insightCount').textContent = rated
+    ? `По ${ratedText}. Если я ошибся, уберите лишнее — меню это учтёт.`
+    : 'Вы пока ничего не оценили.';
+  box.querySelectorAll('.insight-chip').forEach(btn => {
+    btn.onclick = () => {
+      state.taste.muted[btn.dataset.axis + ':' + btn.dataset.key] = true;
+      renderInsights();
+    };
+  });
+  const more = $('#btnInsightMore');
+  if (more) more.style.display = (state.deckPool || []).length > state.deck.length ? '' : 'none';
+}
+
+function continueSwiping() {
+  if (!$('#screen-insight').classList.contains('active')) return;
+  state.deck = state.deck.slice(0, state.deckIdx);
+  const next = pickNextCard();
+  if (!next) return;
+  state.deck.push(next);
+  state.swipeMin = state.deckIdx + SWIPE_EXTRA;
+  state.swipeMax = state.deckIdx + SWIPE_EXTRA;
+  state.swipeLock = false;
+  showScreen('swiper');
+  renderSwiperCard();
+  updateSwiperUI();
+}
+
+function startMenuBuild() {
+  if (!$('#screen-insight').classList.contains('active')) return;
+  showScreen('loading');
+  runLoadingSequence();
 }
 
 
 function startSwiper() {
-  if (!state.taste || !state.taste.sample) {
-    state.taste = { tags: {}, cuisine: {}, protein: {}, meal: {}, sample: 0 };
-  }
   renderSwiperCard();
   updateSwiperUI();
 }
 
 function renderSwiperCard() {
   const stack = $('#swiperStack');
-  stack.querySelectorAll('.dish-card').forEach(c => c.remove());
+  stack.querySelectorAll('.dish-card').forEach(c => {
+    if (c.cleanupDrag) c.cleanupDrag();
+    c.remove();
+  });
+  state.swipeLock = false;
   if (state.deckIdx >= state.deck.length) {
     finishSwipe();
     return;
@@ -2716,18 +2981,29 @@ function setupCardDrag(card) {
   window.addEventListener('pointermove', onMove);
   window.addEventListener('pointerup', onEnd);
   window.addEventListener('pointercancel', onEnd);
+  card.cleanupDrag = () => {
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onEnd);
+    window.removeEventListener('pointercancel', onEnd);
+  };
 }
 
 function swipe(dir) {
-  try { tgHaptic(dir === 'super' ? 'success' : 'light'); } catch (e) {}
+  if (state.swipeLock) return; // карточка ещё улетает: новая оценка относилась бы к невидимой
   const d = state.deck[state.deckIdx];
   if (!d) return;
-  let val = dir === 'yes' ? 1 : dir === 'super' ? 2 : -1;
+  state.swipeLock = true;
+  try { tgHaptic(dir === 'super' ? 'success' : 'light'); } catch (e) {}
+  const val = dir === 'yes' ? 1 : dir === 'super' ? 2 : -1;
   state.likes[d.id] = val;
   updateTasteFromDish(d, val);
   state.history.push({id: d.id, val, idx: state.deckIdx});
-  adaptDeckAfterSwipe();
   state.deckIdx++;
+  if (!swipingEnough()) {
+    const next = pickNextCard();
+    if (next) state.deck.push(next);
+  }
+  const showNext = () => { renderSwiperCard(); updateSwiperUI(); };
   const card = $('#swiperStack .dish-card');
   if (card) {
     const tx = dir === 'no' ? -400 : 400;
@@ -2735,7 +3011,9 @@ function swipe(dir) {
     card.style.transition = 'transform .3s ease, opacity .3s';
     card.style.transform = `translate(${tx}px,${ty}px) rotate(${tx*0.1}deg)`;
     card.style.opacity = '0';
-    setTimeout(() => { renderSwiperCard(); updateSwiperUI(); }, 280);
+    setTimeout(showNext, 280);
+  } else {
+    showNext();
   }
   $('#hintLeft').style.opacity = 0;
   $('#hintRight').style.opacity = 0;
@@ -2743,26 +3021,27 @@ function swipe(dir) {
 }
 
 function undoSwipe() {
-  if (!state.history.length) return;
+  if (state.swipeLock || !state.history.length) return;
   const last = state.history.pop();
   const d = DISHES.find(x => x.id == last.id);
-  if (d && last.val) updateTasteFromDish(d, -last.val);
+  if (d && last.val) updateTasteFromDish(d, last.val, -1);
   delete state.likes[last.id];
   state.deckIdx = last.idx;
+  state.deck = state.deck.slice(0, last.idx + 1);
   renderSwiperCard();
   updateSwiperUI();
 }
 
 function updateSwiperUI() {
-  const total = state.deck.length;
-  const done = state.deckIdx;
-  $('#swiperProgress').textContent = `${done} из ${total}`;
-  if (done >= total) finishSwipe();
+  if (state.deckIdx >= state.deck.length) return;
+  const percent = Math.round(tasteConfidence() * 100);
+  $('#swiperProgress').textContent = `Карточка ${state.deckIdx + 1} · вкус понятен на ${percent}%`;
 }
 
 function finishSwipe() {
-  showScreen('loading');
-  runLoadingSequence();
+  if (!$('#screen-swiper').classList.contains('active')) return;
+  renderInsights();
+  showScreen('insight');
 }
 
 function runLoadingSequence() {
@@ -2796,19 +3075,9 @@ function runLoadingSequence() {
 
 // ===================== MENU GENERATOR =====================
 function dishScore(d) {
-  let s = state.likes[d.id] || 0;
-  Object.entries(state.likes).forEach(([id, val]) => {
-    const liked = DISHES.find(x => x.id == id);
-    if (!liked) return;
-    liked.tags.forEach(t => {
-      if (d.tags.includes(t)) s += val * 0.25;
-    });
-    // cuisine / protein affinity from explicit likes
-    if (dishCuisine(liked) === dishCuisine(d)) s += val * 0.35;
-    if (proteinKey(liked) === proteinKey(d)) s += val * 0.3;
-  });
-  // Continuous taste vector from swipes
-  s += tasteScore(d) * 0.85;
+  let s = (state.likes[d.id] || 0) * 10;
+  s += tasteScore(d);
+  s += (state.jitter && state.jitter[d.id] || 0) * 3; // разнообразие между сборками
   // Budget preference: cheaper or pricier dishes depending on slider
   try {
     const tier = budgetTier();
@@ -2831,6 +3100,16 @@ function generateMenu() {
   let candidates = filterDishes().filter(d => (state.likes[d.id] || 0) >= 0);
   if (candidates.length < 14) candidates = filterDishes().filter(d => (state.likes[d.id] || 0) > -1);
   if (candidates.length < 10) candidates = filterDishes();
+
+  // Белок, отвергнутый дважды и более, убираем, если без него хватает блюд на каждый приём
+  const enoughForMeals = list => mealTypes.every(mt => list.filter(d => d.meal === mt).length >= 8);
+  Object.keys((state.taste && state.taste.protein) || {})
+    .filter(key => tasteCount('protein', key) >= 2 && tastePref('protein', key) <= -0.5)
+    .sort((a, b) => tastePref('protein', a) - tastePref('protein', b))
+    .forEach(key => {
+      const left = candidates.filter(d => proteinKey(d) !== key);
+      if (enoughForMeals(left)) candidates = left;
+    });
 
   // ---- Dietitian taxonomy ----
   const proteinFamily = (d) => {
@@ -2899,8 +3178,9 @@ function generateMenu() {
     const pw = ctx.proteinWeek[pf] || 0;
     if (pw === 0) s += 30;
     else if (pw >= 3) s -= 40;
-    if (pf === 'рыба' && (ctx.proteinWeek['рыба'] || 0) < 2) s += 35;
-    if (pf === 'бобовые' && (ctx.proteinWeek['бобовые'] || 0) < 1) s += 28;
+    // Бонус за полезный белок — только если человек его не отверг
+    if (pf === 'рыба' && (ctx.proteinWeek['рыба'] || 0) < 2 && tastePref('protein', 'рыба') > -0.3) s += 35;
+    if (pf === 'бобовые' && (ctx.proteinWeek['бобовые'] || 0) < 1 && tastePref('protein', 'бобовые') > -0.3) s += 28;
     if (pf === 'курица' && (ctx.proteinWeek['курица'] || 0) >= 3) s -= 45;
     if (ctx.dayProteins.has(pf) && pf !== 'прочее') s -= 60;
 
@@ -3498,7 +3778,7 @@ function openReplace(mealIdx) {
   const candidates = filterDishes()
     .filter(d => d.meal === mt && d.id !== current.dish.id)
     .filter(d => (state.likes[d.id]||0) >= 0)
-    .sort((a,b) => Math.abs(a.kcal - current.dish.kcal) - Math.abs(b.kcal - current.dish.kcal))
+    .sort((a,b) => (Math.abs(a.kcal - current.dish.kcal) / 10 - dishScore(a)) - (Math.abs(b.kcal - current.dish.kcal) / 10 - dishScore(b)))
     .slice(0, 5);
   const list = $('#altList');
   if (!candidates.length) {
@@ -3956,6 +4236,8 @@ function init() {
   on('btnSuper', function(){ swipe('super'); });
   on('btnUndo', undoSwipe);
   on('btnFinishSwipe', finishSwipe);
+  on('btnInsightBuild', startMenuBuild);
+  on('btnInsightMore', continueSwiping);
   on('btnToShop', function() {
     try { renderShop(); } catch (e) { console.error('renderShop', e); }
     showScreen('shop');
@@ -3979,7 +4261,7 @@ on('swiperBack', function(){ showScreen('quiz'); });
       state.norms = null;
       state.shopChecks = {};
       state.cookPlan = null;
-      state.taste = { tags: {}, cuisine: {}, protein: {}, meal: {}, sample: 0 };
+      state.taste = newTaste();
       state.currentDay = 0;
       showScreen('welcome');
     }

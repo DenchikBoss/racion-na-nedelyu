@@ -431,6 +431,30 @@ body {
 .action-btn.undo { color: var(--text-muted); border: 2px solid var(--border); font-size: 1.1rem; }
 .swiper-progress { text-align: center; color: var(--text-muted); font-size: .9rem; margin-bottom: 6px; }
 
+/* Insight: что понято про вкус */
+.insight-count { color: var(--text-muted); font-size: .9rem; margin-bottom: 16px; text-align: center; }
+.insight-list { flex: 1; margin-bottom: 16px; }
+.insight-group { margin-bottom: 20px; }
+.insight-group h4 { font-size: .95rem; margin-bottom: 10px; }
+.insight-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.insight-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 14px;
+  border-radius: 20px;
+  border: 1.5px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text);
+  font: inherit;
+  font-size: .9rem;
+  cursor: pointer;
+}
+.insight-chip span { color: var(--text-muted); font-size: .75rem; }
+.insight-chip.love { border-color: var(--success); }
+.insight-chip.avoid { border-color: var(--danger); }
+
 /* Loading steps */
 .loading-screen { align-items: center; justify-content: center; text-align: center; }
 .loading-icon {
