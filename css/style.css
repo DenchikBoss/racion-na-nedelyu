@@ -1468,3 +1468,27 @@ html.tg-fullscreen #dayTabs { top: calc(var(--tg-safe-area-inset-top, 0px) + var
 html.tg-fullscreen #recipeModal, html.tg-fullscreen #replaceModal, html.tg-fullscreen .modal-overlay {
   padding-top: calc(var(--tg-safe-area-inset-top, 0px) + var(--tg-content-safe-area-inset-top, 0px));
 }
+
+/* Короткие экраны: карточка и кнопки свайпера помещаются без прокрутки */
+@media (max-height: 760px) {
+  .dish-card .photo { height: 190px !important; }
+  .swiper-stack { min-height: 340px; }
+  .dish-card .body { padding: 12px 14px; }
+  .swiper-actions { padding: 8px 0; }
+  #screen-swiper .action-btn { width: 50px; height: 50px; }
+}
+@media (max-height: 620px) {
+  .dish-card .photo { height: 120px !important; }
+  .swiper-stack { min-height: 255px; }
+  #screen-swiper > p { display: none; }
+  #screen-swiper .header { margin-bottom: 4px; }
+}
+
+.quiz-error {
+  color: var(--danger);
+  font-size: .9rem;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+input.input-error { border-color: var(--danger) !important; }
+.meal-storage { color: var(--text-muted); font-size: .8rem; margin-top: 4px; line-height: 1.35; }
