@@ -705,6 +705,8 @@ body {
   cursor: pointer;
 }
 .alt-item:hover { border-color: var(--primary); }
+.replace-note { color: var(--text-muted); font-size: .9rem; margin-bottom: 12px; }
+.alt-photo-fallback { width: 56px; height: 56px; border-radius: 12px; flex-shrink: 0; align-items: center; justify-content: center; font-size: 1.6rem; }
 .alt-item .emoji { font-size: 1.8rem; }
 
 .theme-toggle {
