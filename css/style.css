@@ -1645,3 +1645,66 @@ input.input-error { outline: 2px solid var(--danger); }
 /* Нажимаемые элементы не ниже 44 px */
 .chip, .option, .day-tab, .replace-btn, .recipe-btn, .theme-toggle, .insight-chip, .shop-tab, .btn-ghost { min-height: 44px; }
 .theme-toggle, #shopBack, #swiperBack, #quizBack { min-width: 44px; }
+
+/* ===== Упрощение экранов ===== */
+.macro-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.macro-pills span { padding: 2px 10px; border-radius: 999px; background: var(--badge-bg); color: var(--badge-ink); font-size: .78rem; font-weight: 700; white-space: nowrap; }
+.summary-card .big small { font-size: .95rem; font-weight: 600; color: var(--ink-2); }
+.summary-card .cost-line { display: flex; justify-content: space-between; gap: 8px; }
+#dayMacros { display: none; }
+.menu-details { margin-bottom: 14px; }
+.menu-details > summary { min-height: 44px; display: flex; align-items: center; padding: 0 16px; border-radius: 20px; background: var(--bg); box-shadow: var(--shadow-btn); cursor: pointer; font-weight: 700; color: var(--ink); list-style: none; }
+.menu-details > summary::-webkit-details-marker { display: none; }
+.menu-details > summary::after { content: '▾'; margin-left: auto; color: var(--ink-2); }
+.menu-details[open] > summary::after { content: '▴'; }
+.menu-details[open] > summary { margin-bottom: 14px; }
+.menu-details .family-kcal-box, .menu-details .portions-bar, .menu-details .cook-plan { margin-bottom: 12px; }
+.cook-plan { font-size: .85rem; line-height: 1.4; padding: 12px 16px; border-radius: 20px; background: var(--bg); box-shadow: var(--shadow-inset); }
+.meal-item { align-items: flex-start !important; }
+.meal-item .info h4 { white-space: normal !important; overflow: visible; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.25; }
+.meal-item .info .meta { margin-top: 2px; }
+.meal-actions { display: flex; gap: 8px; margin-top: 8px; }
+.meal-actions .recipe-btn, .meal-actions .replace-btn { flex: 1; min-height: 44px; border-radius: 16px; font-weight: 700; font-size: .85rem; text-decoration: none; box-shadow: var(--shadow-btn); color: var(--link); padding: 0 10px; }
+.chip { font: inherit; cursor: pointer; }
+.chip-more { color: var(--link) !important; font-weight: 700; }
+.segment { display: flex; gap: 4px; padding: 4px; border-radius: 24px; background: var(--seg-bg); box-shadow: var(--shadow-inset); }
+.segment .seg-opt { flex: 1; min-height: 52px; justify-content: center; border: none; border-radius: 20px; font: inherit; font-size: 1.3rem; font-weight: 800; background: transparent !important; box-shadow: none !important; color: var(--ink-2); padding: 0; }
+.segment .seg-opt.selected { background: var(--seg-active) !important; color: var(--ink) !important; box-shadow: var(--shadow-btn) !important; outline: none; }
+.option-chips .chip { padding: 10px 16px; }
+.option-chips .chip.selected { outline: 2px solid var(--accent); outline-offset: -2px; }
+.cook-strip { margin-top: 14px; }
+.cook-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cook-day { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0; border-radius: 12px; font-size: .9rem; background: var(--bg); box-shadow: var(--shadow-btn); }
+.cook-day b { font-size: .75rem; color: var(--ink-2); }
+.cook-day.reheat { box-shadow: var(--shadow-inset); background: var(--mark-bg); }
+.cook-legend { margin-top: 8px; font-size: .8rem; color: var(--ink-2); line-height: 1.4; }
+#quizStepName:empty, #quizStepLabel:empty { visibility: hidden; }
+.dish-card .macro-pills { margin-top: 8px; }
+
+/* ===== Окно рецепта ===== */
+.recipe-title { margin: 4px 0 8px; }
+.recipe-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.recipe-meta .serv { font-weight: 700; }
+.recipe-h { font-size: .85rem; color: var(--ink-2); margin: 16px 0 8px; text-transform: uppercase; letter-spacing: .04em; }
+.recipe-tip { margin-top: 12px; padding: 12px 14px; border-radius: 16px; font-size: .9rem; background: var(--bg); box-shadow: var(--shadow-inset); }
+.recipe-kbju { margin-top: 14px; padding: 0 14px; border-radius: 16px; background: var(--bg); box-shadow: var(--shadow-btn); }
+.recipe-kbju > summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-weight: 700; list-style: none; }
+.recipe-kbju > summary::-webkit-details-marker { display: none; }
+.recipe-kbju > summary::after { content: '▾'; margin-left: auto; color: var(--ink-2); }
+.recipe-kbju[open] > summary::after { content: '▴'; }
+.recipe-kbju[open] { padding-bottom: 12px; }
+.kbju-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 8px; font-size: .8rem; padding: 4px 0; border-bottom: 1px solid var(--line); }
+.kbju-row > span:last-child { color: var(--ink-2); }
+.kbju-total { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 8px; margin-top: 8px; font-weight: 700; font-size: .9rem; }
+.kbju-note { font-size: .72rem; color: var(--ink-2); margin-top: 6px; }
+
+/* ===== Книга рецептов ===== */
+.book-search { width: 100%; min-height: 48px; padding: 0 16px; font: inherit; margin-bottom: 12px; }
+.book-chips { margin-bottom: 14px; }
+.book-list { display: flex; flex-direction: column; gap: 10px; }
+.book-item { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 12px; border: none; border-radius: 20px; background: var(--bg); color: var(--ink); box-shadow: var(--shadow-btn); font: inherit; text-align: left; cursor: pointer; min-height: 44px; }
+.book-text { display: flex; flex-direction: column; min-width: 0; }
+.book-name { font-weight: 700; line-height: 1.25; }
+.book-meta { font-size: .82rem; color: var(--ink-2); margin-top: 2px; }
+.book-all { display: flex; align-items: center; gap: 10px; min-height: 44px; margin-top: 12px; color: var(--ink-2); }
+.book-all[hidden] { display: none; }

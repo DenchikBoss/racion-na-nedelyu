@@ -1160,10 +1160,11 @@ const QUIZ_STEPS = [
     name: "Приёмы",
     title: "Сколько приёмов пищи в день?",
     hint: "Для основного едока. На семью масштабируем порции.",
+    view: "segment",
     options: [
-      {v:"3", l:"3 приёма", icon:"🍽️"},
-      {v:"4", l:"4 приёма", icon:"🍽️"},
-      {v:"5", l:"5 приёмов", icon:"🍽️"}
+      {v:"3", l:"3"},
+      {v:"4", l:"4"},
+      {v:"5", l:"5"}
     ]
   },
   {
@@ -1210,6 +1211,7 @@ const QUIZ_STEPS = [
     name: "Время",
     title: "Время на готовку в «быстрые» дни",
     hint: "Лимит для блюд без долгой готовки",
+    view: "chips",
     options: [
       {v:"15", l:"До 15 минут", icon:"⚡"},
       {v:"20", l:"До 20 минут", icon:"⏱️"},
@@ -2191,14 +2193,30 @@ function calcNorms(q) {
 }
 
 // ===================== QUIZ =====================
+/** Полоска из семи дней: когда готовим, когда разогреваем, когда быстрое. */
+function renderCookStrip(step) {
+  const box = document.getElementById('cookStrip');
+  if (!box) return;
+  const v = state.quiz.cookDays;
+  if (!v) { box.innerHTML = ''; return; }
+  const plan = getDayRoles(Number(v));
+  const roles = plan.roles || plan;
+  const days = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+  const icon = { batch: '🍳', reheat: '♻️', quick: '⚡' };
+  const opt = (step.options || []).find(o => o.v === String(v));
+  box.innerHTML = '<div class="cook-days">' + days.map((d, i) =>
+    `<span class="cook-day ${roles[i]}"><b>${d}</b>${icon[roles[i]] || ''}</span>`).join('') + '</div>'
+    + `<p class="cook-legend">🍳 готовка · ♻️ разогрев · ⚡ быстрое${opt && opt.desc ? '<br>' + opt.desc : ''}</p>`;
+}
+
 function renderQuiz() {
   const step = QUIZ_STEPS[state.quizStep];
   const total = QUIZ_STEPS.length;
   const progress = (state.quizStep / total) * 100;
   $('#quizProgress').style.width = progress + '%';
-  $('#quizStepLabel').textContent = step.name;
+  $('#quizStepLabel').textContent = '';
   $('#quizStepCount').textContent = (state.quizStep + 1) + ' из ' + total;
-  $('#quizStepName').textContent = step.name;
+  $('#quizStepName').textContent = '';
 
   const c = $('#quizContent');
   let html = `<div class="question-title">${step.title}</div>`;
@@ -2229,7 +2247,6 @@ function renderQuiz() {
           <button type="button" id="kidsPlus">+</button>
         </div>
       </div>
-      <div class="family-summary" id="familySummary"></div>
     `;
     c.innerHTML = html;
     updateFamilySummary();
@@ -2360,10 +2377,7 @@ function renderQuiz() {
       <div style="display:flex;justify-content:space-between;font-size:.75rem;color:var(--text-muted);margin-top:6px">
         <span>Эконом</span><span>Стандарт</span><span>Комфорт</span><span>Премиум</span>
       </div>
-      <p style="font-size:.8rem;color:var(--text-muted);margin-top:12px;line-height:1.4">
-        Ползунок влияет на подбор блюд: при низком бюджете — простые и недорогие позиции,
-        при высоком — больше рыбы, морепродуктов и «удобных» блюд.
-      </p>`;
+`;
     c.innerHTML = html;
     const slider = document.getElementById('budgetSlider');
     const updateBud = () => {
@@ -2390,34 +2404,32 @@ function renderQuiz() {
   }
 
   if (step.type === 'restrictions') {
-    const allergens = state.quiz.allergens || [];
-    const dislikes = state.quiz.dislikes || [];
-    const diet = state.quiz.diet || [];
-    html += `<div class="chip-section"><h4>Аллергии</h4><div class="chips" id="allergenChips">`;
-    ALLERGENS.forEach(o => {
-      const sel = allergens.includes(o.v) ? 'selected' : '';
-      html += `<div class="chip ${sel}" data-group="allergens" data-v="${o.v}">${o.icon} ${o.l}</div>`;
+    const picked = { allergens: state.quiz.allergens || [], dislikes: state.quiz.dislikes || [], diet: state.quiz.diet || [] };
+    // «Без лактозы» и «Без глютена» совпадали с аллергенами «Лактоза» и «Глютен»: оставлены только аллергены
+    const groups = [
+      { key: 'diet', title: 'Питание', items: [{v: 'vegetarian', l: '🌱 Вегетарианство'}, {v: 'vegan', l: '🥬 Веганство'}] },
+      { key: 'allergens', title: 'Аллергии и непереносимость', items: ALLERGENS.map(o => ({v: o.v, l: o.icon + ' ' + o.l})), frequent: ['лактоза', 'глютен', 'орехи', 'яйца', 'рыба'] },
+      { key: 'dislikes', title: 'Не люблю', items: DISLIKES.map(o => ({v: o.v, l: o.icon + ' ' + o.l})), frequent: ['лук', 'грибы', 'свинина', 'красное мясо', 'острое'] }
+    ];
+    groups.forEach(g => {
+      const open = state.restrictionsOpen && state.restrictionsOpen[g.key];
+      const shown = g.items.filter(o => !g.frequent || open || g.frequent.includes(o.v) || picked[g.key].includes(o.v));
+      const rest = g.items.length - shown.length;
+      html += `<div class="chip-section"><h4>${g.title}</h4><div class="chips">`;
+      shown.forEach(o => {
+        html += `<button type="button" class="chip ${picked[g.key].includes(o.v) ? 'selected' : ''}" data-group="${g.key}" data-v="${o.v}" aria-pressed="${picked[g.key].includes(o.v)}">${o.l}</button>`;
+      });
+      if (rest > 0) html += `<button type="button" class="chip chip-more" data-more="${g.key}">Ещё ${rest}</button>`;
+      html += `</div></div>`;
     });
-    html += `</div></div>`;
-    html += `<div class="chip-section"><h4>Не люблю</h4><div class="chips" id="dislikeChips">`;
-    DISLIKES.forEach(o => {
-      const sel = dislikes.includes(o.v) ? 'selected' : '';
-      html += `<div class="chip ${sel}" data-group="dislikes" data-v="${o.v}">${o.icon} ${o.l}</div>`;
-    });
-    html += `</div></div>`;
-    html += `<div class="chip-section"><h4>Диета</h4><div class="chips" id="dietChips">`;
-    [
-      {v:"vegetarian", l:"🌱 Вегетарианство"},
-      {v:"vegan", l:"🥬 Веганство"},
-      {v:"lactose_free", l:"🥛 Без лактозы"},
-      {v:"gluten_free", l:"🌾 Без глютена"}
-    ].forEach(o => {
-      const sel = diet.includes(o.v) ? 'selected' : '';
-      html += `<div class="chip ${sel}" data-group="diet" data-v="${o.v}">${o.l}</div>`;
-    });
-    html += `</div></div>`;
     c.innerHTML = html;
-    c.querySelectorAll('.chip').forEach(el => {
+    c.querySelectorAll('.chip-more').forEach(el => {
+      el.onclick = () => {
+        state.restrictionsOpen = Object.assign({}, state.restrictionsOpen, { [el.dataset.more]: true });
+        renderQuiz();
+      };
+    });
+    c.querySelectorAll('.chip[data-group]').forEach(el => {
       el.onclick = () => {
         const g = el.dataset.group;
         const v = el.dataset.v;
@@ -2430,6 +2442,7 @@ function renderQuiz() {
           arr.push(v);
           el.classList.add('selected');
         }
+        el.setAttribute('aria-pressed', el.classList.contains('selected'));
       };
     });
     $('#quizNext').disabled = false;
@@ -2437,23 +2450,37 @@ function renderQuiz() {
   }
 
   if (step.type === 'options') {
-    const cls = step.grid ? 'option-grid' : 'options';
-    html += `<div class="${cls}">`;
-    step.options.forEach(o => {
-      const sel = state.quiz[step.id] === o.v ? 'selected' : '';
-      const desc = o.desc ? `<span class="opt-desc">${o.desc}</span>` : '';
-      html += `<div class="option ${sel}" data-v="${o.v}"><span class="icon">${o.icon||''}</span><span class="opt-text"><span class="opt-label">${o.l}</span>${desc}</span></div>`;
-    });
-    html += '</div>';
+    if (step.view === 'segment' || step.view === 'chips') {
+      html += `<div class="${step.view === 'segment' ? 'segment' : 'chips option-chips'}" role="radiogroup">`;
+      step.options.forEach(o => {
+        const sel = state.quiz[step.id] === o.v;
+        html += `<button type="button" role="radio" aria-checked="${sel}" class="option ${step.view === 'segment' ? 'seg-opt' : 'chip'} ${sel ? 'selected' : ''}" data-v="${o.v}">${o.l}</button>`;
+      });
+      html += '</div>';
+    } else {
+      const cls = step.grid ? 'option-grid' : 'options';
+      html += `<div class="${cls}">`;
+      step.options.forEach(o => {
+        const sel = state.quiz[step.id] === o.v ? 'selected' : '';
+        // У «Готовки» подпись в одну строку, расписание — полоской под вариантами
+        const desc = o.desc && step.id !== 'cookDays' ? `<span class="opt-desc">${o.desc}</span>` : '';
+        html += `<div class="option ${sel}" data-v="${o.v}"><span class="icon">${o.icon||''}</span><span class="opt-text"><span class="opt-label">${o.l}</span>${desc}</span></div>`;
+      });
+      html += '</div>';
+    }
+    if (step.id === 'cookDays') html += '<div class="cook-strip" id="cookStrip"></div>';
     c.innerHTML = html;
     c.querySelectorAll('.option').forEach(el => {
       el.onclick = () => {
         state.quiz[step.id] = el.dataset.v;
-        c.querySelectorAll('.option').forEach(x => x.classList.remove('selected'));
+        c.querySelectorAll('.option').forEach(x => { x.classList.remove('selected'); x.setAttribute('aria-checked', 'false'); });
         el.classList.add('selected');
+        el.setAttribute('aria-checked', 'true');
         $('#quizNext').disabled = false;
+        if (step.id === 'cookDays') renderCookStrip(step);
       };
     });
+    if (step.id === 'cookDays') renderCookStrip(step);
     $('#quizNext').disabled = !state.quiz[step.id];
     return;
   }
@@ -2508,12 +2535,6 @@ function updateFamilySummary() {
   const a = state.quiz.adults || 2;
   const k = state.quiz.kids;
   const kc = state.quiz.kidsCount || (k ? 1 : 0);
-  const el = $('#familySummary');
-  if (!el) return;
-  let text = `Семья: ${a} взросл.`;
-  if (k && kc) text += ` + ${kc} дет.`;
-  text += '. Дальше укажем рост и вес каждого — посчитаем общую норму калорий.';
-  el.textContent = text;
   state.familyPortions = a + kc * 0.75;
 }
 
@@ -2681,9 +2702,6 @@ function dishHasDisliked(d, dl) {
 
 function filterDishes() {
   const q = state.quiz;
-  const diet = q.diet || [];
-  const allergens = q.allergens || [];
-  const dislikes = q.dislikes || [];
   const kitchen = q.kitchen || [];
   const maxTime = +q.time || 999;
   const tier = budgetTier();
@@ -2692,22 +2710,32 @@ function filterDishes() {
   return DISHES.filter(d => {
     if (d.time > maxTime) return false;
     if (d.cost > maxCost) return false;
-    if (diet.includes('vegan') && !d.diet.includes('vegan')) return false;
-    if (diet.includes('vegetarian') && !d.diet.includes('vegetarian') && !d.diet.includes('vegan')) return false;
-    if (diet.includes('lactose_free') && !d.diet.includes('lactose_free')) return false;
-    if (diet.includes('gluten_free') && !d.diet.includes('gluten_free')) return false;
-    // allergens
-    for (const a of allergens) {
-      if (d.allergens.includes(a)) return false;
-      if (a === 'рыба' && (d.tags.includes('рыба') || d.tags.includes('лосось'))) return false;
-      if (a === 'морепродукты' && d.tags.includes('морепродукты')) return false;
-      if (a === 'глютен' && !d.diet.includes('gluten_free') && d.allergens.includes('глютен')) return false;
-    }
-    // dislikes
-    if (dislikes.some(dl => dishHasDisliked(d, dl))) return false;
+    if (!passesRestrictions(d)) return false;
     if (!hasKitchenFor(d, kitchen)) return false;
     return true;
   });
+}
+
+/** Аллергены, диета и нелюбимые продукты из опроса — то, что нельзя показывать. */
+function passesRestrictions(d) {
+  const q = state.quiz || {};
+  const diet = q.diet || [];
+  const allergens = q.allergens || [];
+  const dislikes = q.dislikes || [];
+  if (diet.includes('vegan') && !d.diet.includes('vegan')) return false;
+  if (diet.includes('vegetarian') && !d.diet.includes('vegetarian') && !d.diet.includes('vegan')) return false;
+  if (diet.includes('lactose_free') && !d.diet.includes('lactose_free')) return false;
+  if (diet.includes('gluten_free') && !d.diet.includes('gluten_free')) return false;
+  // allergens
+  for (const a of allergens) {
+    if (d.allergens.includes(a)) return false;
+    if (a === 'рыба' && (d.tags.includes('рыба') || d.tags.includes('лосось'))) return false;
+    if (a === 'морепродукты' && d.tags.includes('морепродукты')) return false;
+    if (a === 'глютен' && !d.diet.includes('gluten_free') && d.allergens.includes('глютен')) return false;
+  }
+  // dislikes
+  if (dislikes.some(dl => dishHasDisliked(d, dl))) return false;
+  return true;
 }
 
 function proteinKey(d) {
@@ -3050,6 +3078,8 @@ function startMenuBuild() {
 
 
 function startSwiper() {
+  const hint = document.getElementById('swipeHint');
+  if (hint) hint.hidden = false;
   renderSwiperCard();
   updateSwiperUI();
 }
@@ -3076,11 +3106,8 @@ function renderSwiperCard() {
     </div>
     <div class="body">
       <h3>${d.name}</h3>
-      <div class="macros">
-        <span>${d.kcal} ккал</span>
-        <span>Б ${d.p}г · Ж ${d.f}г · У ${d.c}г</span>
-      </div>
-      <div class="tags">${d.tags.slice(0,4).map(t=>`<span class="tag">${t}</span>`).join('')}</div>
+      <div class="macros"><span>${d.kcal} ккал</span></div>
+      <div class="macro-pills"><span>Б ${d.p}</span><span>Ж ${d.f}</span><span>У ${d.c}</span></div>
     </div>
   `;
   stack.appendChild(card);
@@ -3145,6 +3172,8 @@ function swipe(dir) {
   state.likes[d.id] = val;
   updateTasteFromDish(d, val);
   state.history.push({id: d.id, val, idx: state.deckIdx});
+  const hint = document.getElementById('swipeHint');
+  if (hint) hint.hidden = true; // подсказка нужна только до первого свайпа
   state.deckIdx++;
   if (!swipingEnough()) {
     const next = pickNextCard();
@@ -3451,6 +3480,11 @@ function generateMenu() {
   }
 
 
+  state.menu = applyCookPlan(menu);
+  state.currentDay = 0;
+  state.shopChecks = {};
+}
+
 // ===================== COOK PLAN (batch / quick / reheat) =====================
 /** Day roles: 0=Пн ... 6=Вс. batch = полная готовка, quick = быстрое, reheat = разогрев */
 function getDayRoles(freq) {
@@ -3644,12 +3678,6 @@ function applyCookPlan(menu) {
   return menu;
 }
 
-
-  state.menu = applyCookPlan(menu);
-  state.currentDay = 0;
-  state.shopChecks = {};
-}
-
 function calcDayTotals(meals) {
   let k=0,p=0,f=0,c=0;
   meals.forEach(m => {
@@ -3696,15 +3724,18 @@ function renderMenu() {
   const budget = state.quiz.budget || 0;
   const costNote = budget ? (weekCost <= budget ? 'в рамках бюджета' : 'выше бюджета на ' + (weekCost - budget).toLocaleString('ru-RU') + ' ₽') : '';
   const famKcal = n.totalKcal || n.kcal;
+  const dayNames = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
+  const today = state.menu[state.currentDay] || state.menu[0];
+  const t0 = today.totals || calcDayTotals(today.meals);
   $('#menuSummary').innerHTML = `
-    <h2>Норма на всю семью в день</h2>
-    <div class="big">${famKcal} ккал</div>
-    <div class="sub">Б ${n.totalP || n.p} г · Ж ${n.totalF || n.f} г · У ${n.totalC || n.c} г · масштаб ×${n.scale || 1}</div>
+    <h2>${dayNames[state.currentDay] || ''} · на человека</h2>
+    <div class="big">${t0.kcal} <small>из ${n.kcal} ккал</small></div>
+    <div class="macro-pills"><span>Б ${t0.p} г</span><span>Ж ${t0.f} г</span><span>У ${t0.c} г</span></div>
     <div class="cost-line">
-      <span>Ориентир покупок на неделю</span>
+      <span>Покупки на неделю</span>
       <strong style="white-space:nowrap">~${weekCost.toLocaleString('ru-RU')} ₽</strong>
     </div>
-    ${budget ? `<div class="sub" style="margin-top:4px;opacity:.85">${costNote} · бюджет ${budget.toLocaleString('ru-RU')} ₽</div>` : ''}
+    ${budget ? `<div class="sub">${costNote} · бюджет ${budget.toLocaleString('ru-RU')} ₽</div>` : ''}
   `;
   const box = $('#familyKcalBox');
   if (box && n.members) {
@@ -3714,7 +3745,8 @@ function renderMenu() {
       </div>`
     ).join('') + `<div style="display:flex;justify-content:space-between;padding-top:8px;font-weight:700">
       <span>Итого семья</span><span class="big" style="font-size:1.1rem">${famKcal} ккал</span>
-    </div>`;
+    </div>
+    <div class="macro-pills"><span>Б ${n.totalP || n.p} г</span><span>Ж ${n.totalF || n.f} г</span><span>У ${n.totalC || n.c} г</span></div>`;
   }
 
   const scale = (state.norms && state.norms.scale) || 1;
@@ -3786,11 +3818,14 @@ function renderMenu() {
           onerror="this.outerHTML='<div class=meal-thumb-fallback>${m.dish.emoji}</div>'" />
         <div class="info">
           <h4 data-recipe="${m.dish.id}" data-portion="${m.portion||1}" data-cover="${m.coversDays||0}" data-leftover="${m.leftover?1:0}" data-feeds="${(m.feedsLabel||'').replace(/"/g,'')}" data-note="${(m.note||'').replace(/"/g,'')}" data-storage="${m.storage||''}">${m.leftover ? '♻️ ' : (m.quick ? '⚡ ' : '')}${m.dish.name}</h4>
-          <div class="meta">${Math.round(m.dish.kcal*(m.portion||1))} ккал · Б ${Math.round(m.dish.p*(m.portion||1))} · Ж ${Math.round(m.dish.f*(m.portion||1))} · У ${Math.round(m.dish.c*(m.portion||1))} · ${m.dish.time} мин${m.coversDays>1?' · готовка ×'+m.coversDays+' дн.':''}</div>
+          <div class="meta">⏱ ${m.dish.time} мин · ${Math.round(m.dish.kcal*(m.portion||1))} ккал${m.coversDays>1?' · готовка ×'+m.coversDays+' дн.':''}</div>
+          <div class="macro-pills"><span>Б ${Math.round(m.dish.p*(m.portion||1))}</span><span>Ж ${Math.round(m.dish.f*(m.portion||1))}</span><span>У ${Math.round(m.dish.c*(m.portion||1))}</span></div>
           ${m.storage ? `<div class="meal-storage">🧊 ${m.storage}</div>` : ''}
-          <button type="button" class="recipe-btn" data-recipe="${m.dish.id}" data-portion="${m.portion||1}" data-cover="${m.coversDays||0}" data-leftover="${m.leftover?1:0}" data-feeds="${(m.feedsLabel||'').replace(/"/g,'')}" data-note="${(m.note||'').replace(/"/g,'')}" data-storage="${m.storage||''}">Рецепт →</button>
+          <div class="meal-actions">
+          <button type="button" class="recipe-btn" data-recipe="${m.dish.id}" data-portion="${m.portion||1}" data-cover="${m.coversDays||0}" data-leftover="${m.leftover?1:0}" data-feeds="${(m.feedsLabel||'').replace(/"/g,'')}" data-note="${(m.note||'').replace(/"/g,'')}" data-storage="${m.storage||''}">Рецепт</button>
+            <button type="button" class="replace-btn" data-idx="${idx}">Заменить</button>
+          </div>
         </div>
-        <button class="replace-btn" data-idx="${idx}">Заменить</button>
       </div>
     </div>`;
   }).join('');
@@ -3834,7 +3869,10 @@ function openRecipe(dishId, mealCtx) {
 
     let mult, servNote;
     const portion = Number(ctx.portion) || 1; // как в списке покупок: иначе рецепт расходится с закупкой
-    if (ctx.leftover) {
+    if (ctx.single) {
+      mult = 1; // книга рецептов: базовые граммовки на одну порцию
+      servNote = '1 порция';
+    } else if (ctx.leftover) {
       mult = Math.round(family * portion * 100) / 100;
       servNote = 'разогрев, семья ×' + family + ' · порция ×' + portion + ' = ×' + mult;
     } else if (Number(ctx.coversDays) > 1) {
@@ -3872,7 +3910,9 @@ function openRecipe(dishId, mealCtx) {
     if (!body || !modal) { alert('Окно рецепта недоступно'); return; }
 
     var banner = '';
-    if (ctx.leftover) {
+    if (ctx.single) {
+      banner = '';
+    } else if (ctx.leftover) {
       banner = '<div style="margin-bottom:12px;padding:10px 12px;border-radius:10px;background:var(--badge-bg);color:var(--badge-ink);font-size:.88rem">♻️ <strong>Разогрев</strong>'
         + (ctx.note ? (': ' + ctx.note) : '')
         + '. Готовить заново не нужно.' + (ctx.storage ? ' ' + ctx.storage : '') + '</div>';
@@ -3887,57 +3927,33 @@ function openRecipe(dishId, mealCtx) {
     // KBJU from ingredients (scaled)
     var kb = (typeof computeDishKbju === 'function') ? computeDishKbju(d) : { detail: [], kcal: d.kcal, p: d.p, f: d.f, c: d.c };
     var kbjuRows = (kb.detail || []).map(function(row) {
-      return '<div style="display:flex;justify-content:space-between;gap:8px;font-size:.8rem;padding:4px 0;border-bottom:1px solid var(--border)">'
+      return '<div class="kbju-row">'
         + '<span>' + row.n + ' <span style="opacity:.65">' + Math.round(row.g * mult) + ' г</span></span>'
         + '<span style="white-space:nowrap;color:var(--text-muted)">' + Math.round(row.kcal * mult) + ' ккал · Б ' + Math.round(row.p * mult) + ' · Ж ' + Math.round(row.f * mult) + ' · У ' + Math.round(row.c * mult) + '</span>'
         + '</div>';
     }).join('');
-    var kbjuBox = '<div class="recipe-kbju" style="margin:14px 0;padding:12px 14px;background:color-mix(in srgb,var(--primary) 8%,transparent);border-radius:12px">'
-      + '<h4 style="font-size:.85rem;margin:0 0 8px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted)">КБЖУ по продуктам</h4>'
+    var kbjuBox = '<details class="recipe-kbju">'
+      + '<summary>КБЖУ по продуктам</summary>'
       + kbjuRows
-      + '<div style="display:flex;justify-content:space-between;margin-top:8px;font-weight:700;font-size:.9rem">'
-      + '<span>Итого на ' + servNote + '</span>'
-      + '<span>' + Math.round((kb.kcal || d.kcal) * mult) + ' ккал · Б ' + Math.round((kb.p || d.p) * mult) + ' · Ж ' + Math.round((kb.f || d.f) * mult) + ' · У ' + Math.round((kb.c || d.c) * mult) + '</span>'
-      + '</div>'
-      + '<div style="font-size:.72rem;color:var(--text-muted);margin-top:6px">Расчёт по справочным значениям на 100 г продукта и граммовкам в рецепте</div>'
-      + '</div>';
+      + '<div class="kbju-total"><span>Итого на ' + servNote + '</span>'
+      + '<span>' + Math.round((kb.kcal || d.kcal) * mult) + ' ккал · Б ' + Math.round((kb.p || d.p) * mult) + ' · Ж ' + Math.round((kb.f || d.f) * mult) + ' · У ' + Math.round((kb.c || d.c) * mult) + '</span></div>'
+      + '<div class="kbju-note">Расчёт по справочным значениям на 100 г продукта и граммовкам в рецепте</div>'
+      + '</details>';
 
-body.innerHTML = banner +
+    body.innerHTML = banner +
       '<div class="recipe-hero" style="background:' + dishGradient(d) + '">' +
         '<img src="' + dishPhoto(d) + '" alt="Фото блюда" loading="lazy" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'" />' +
         '<div class="hero-fallback" style="display:none">' + (d.emoji || '') + '</div></div>' +
-      '<h3 style="margin-bottom:8px">' + d.name + '</h3>' +
-      '<div class="recipe-meta">' +
-        '<span>⏱ ' + total + ' мин</span><span>🔪 ' + prep + ' подг.</span><span>🔥 ' + cook + ' гот.</span>' +
-        '<span>' + Math.round(d.kcal * mult) + ' ккал</span>' +
-        '<span>Б ' + Math.round(d.p * mult) + ' · Ж ' + Math.round(d.f * mult) + ' · У ' + Math.round(d.c * mult) + '</span>' +
-        '<span style="background:color-mix(in srgb,var(--primary) 18%,transparent);color:var(--primary-dark);font-weight:600">' + servNote + '</span>' +
-      '</div>' +
-      '<div class="recipe-ings"><h4>Ингредиенты (' + servNote + ')</h4>' + ingsHtml + '</div>' + kbjuBox +
-      '<h4 style="font-size:.85rem;color:var(--text-muted);margin:16px 0 8px;text-transform:uppercase;letter-spacing:.04em">Пошагово</h4>' +
+      '<h3 class="recipe-title">' + d.name + '</h3>' +
+      '<div class="recipe-meta"><span>⏱ ' + total + ' мин</span><span>🔪 ' + prep + ' подг.</span><span>🔥 ' + cook + ' гот.</span></div>' +
+      '<div class="recipe-meta"><span>' + Math.round(d.kcal * mult) + ' ккал</span><span>Б ' + Math.round(d.p * mult) + '</span><span>Ж ' + Math.round(d.f * mult) + '</span><span>У ' + Math.round(d.c * mult) + '</span><span class="serv">' + servNote + '</span></div>' +
+      '<div class="recipe-ings"><h4>Ингредиенты</h4>' + ingsHtml + '</div>' +
+      '<h4 class="recipe-h">Пошагово</h4>' +
       '<ol class="recipe-steps">' + scaledSteps.map(function(s) { return '<li>' + s + '</li>'; }).join('') + '</ol>' +
-      (tip ? ('<div style="margin-top:12px;padding:12px 14px;background:color-mix(in srgb,var(--primary) 10%,transparent);border-radius:12px;font-size:.88rem"><strong>💡 Совет:</strong> ' + tip + '</div>') : '');
+      (tip ? ('<div class="recipe-tip"><strong>💡 Совет:</strong> ' + tip + '</div>') : '') +
+      kbjuBox;
 
     modal.dataset.dishId = d.id;
-    const oneBtn = document.getElementById('btnExportOneRecipe');
-    if (oneBtn) {
-      oneBtn.onclick = function() {
-        const lines = [d.name, servNote,
-          'Подготовка ' + prep + ' мин · Готовка ' + cook + ' мин · ~' + total + ' мин',
-          Math.round(d.kcal * mult) + ' ккал · Б ' + Math.round(d.p * mult) + ' · Ж ' + Math.round(d.f * mult) + ' · У ' + Math.round(d.c * mult),
-          '', 'Ингредиенты:',
-          ...(d.ingredients || []).map(function(ing) {
-            const n = (typeof normalizeIngName === 'function') ? normalizeIngName(ing.n) : ing.n;
-            return '  • ' + n + ' — ' + Math.round((Number(ing.g) || 0) * mult) + ' г';
-          }),
-          '', 'Приготовление:',
-          ...scaledSteps.map(function(s, i) { return '  ' + (i + 1) + '. ' + s; })
-        ];
-        const text = lines.join('\n');
-        downloadTextFile((d.name || 'recept') + '.txt', text);
-        showTextModal(d.name, text);
-      };
-    }
     modal.classList.add('open');
   } catch (err) {
     console.error('openRecipe', err);
@@ -4320,85 +4336,59 @@ function printShop() {
   setTimeout(function() { try { w.print(); } catch (e) {} }, 300);
 }
 
-function exportRecipes() {
-  if (!state.menu || !state.menu.length) {
-    alert('Сначала соберите меню на неделю');
-    return;
+// ===================== КНИГА РЕЦЕПТОВ =====================
+const BOOK_MEALS = [['завтрак', 'Завтрак'], ['обед', 'Обед'], ['ужин', 'Ужин'], ['перекус', 'Перекус']];
+
+function openRecipeBook() {
+  state.book = state.book || { query: '', meal: '', showAll: false };
+  const search = document.getElementById('recipeSearch');
+  if (search) {
+    search.value = state.book.query;
+    search.oninput = function() { state.book.query = search.value; renderRecipeBook(); };
   }
-  const dayNames = ['Понедельник','Вторник','Среда','Четверг','Пятница','Суббота','Воскресенье'];
-  const family = (typeof familyServings === 'function') ? familyServings() : 1;
-  const lines = [
-    'Рецепты на неделю — Рацион',
-    '========================',
-    'Семья: ×' + family + ' порц.',
-    'Режим готовки: ' + ((state.quiz && state.quiz.cookDays) || 7) + ' дн./нед.',
-    ''
-  ];
-
-  state.menu.forEach(function(day, di) {
-    const role = day.roleLabel || day.role || '';
-    lines.push('════════════════════════════════');
-    lines.push(dayNames[di] + (role ? (' — ' + role) : ''));
-    if (day.feedsLabel) lines.push('Запас: ' + day.feedsLabel);
-    if (day.fromBatchName) lines.push('Разогрев блюд с: ' + day.fromBatchName);
-    lines.push('--------------------------------');
-
-    (day.meals || []).forEach(function(m) {
-      const d = m.dish;
-      if (!d) return;
-
-      if (m.leftover) {
-        lines.push('');
-        lines.push('♻️ ' + m.meal.toUpperCase() + ': ' + d.name);
-        lines.push('   Разогрев' + (m.note ? (' (' + m.note + ')') : '') + ' — готовить не нужно.');
-        lines.push('   Порция на разогрев: семья ×' + family);
-        if (m.storage) lines.push('   🧊 ' + m.storage);
-        return;
-      }
-
-      const cover = Number(m.coversDays) > 0 ? Number(m.coversDays) : 1;
-      // Столько же, сколько в списке покупок: семья × запас × порция
-      const portion = Number(m.portion) || 1;
-      const mult = Math.round(family * cover * portion * 100) / 100;
-      const R = (typeof getRecipe === 'function') ? getRecipe(d) : { steps: d.recipe || [], prep: 5, cook: d.time || 20 };
-      const steps = Array.isArray(R) ? R : (R.steps || []);
-      const prep = (R && R.prep) || 5;
-      const cook = (R && R.cook) || d.time || 20;
-
-      lines.push('');
-      lines.push((d.emoji || '🍽') + ' ' + m.meal.toUpperCase() + ': ' + d.name);
-      if (cover > 1) {
-        lines.push('   🍳 Готовка с запасом на ' + cover + ' дн.' + (m.feedsLabel ? (' (' + m.feedsLabel + ')') : ''));
-        if (m.storage) lines.push('   🧊 ' + m.storage);
-      }
-      lines.push('   Время: подг. ' + prep + ' + гот. ' + cook + ' ≈ ' + (prep + cook) + ' мин');
-      lines.push('   КБЖУ на весь объём: ' + Math.round(d.kcal * mult) + ' ккал · Б ' + Math.round(d.p * mult) + ' · Ж ' + Math.round(d.f * mult) + ' · У ' + Math.round(d.c * mult));
-      lines.push('   Объём: семья ×' + family + (cover > 1 ? (' × ' + cover + ' дн.') : '') + (portion !== 1 ? (' · порция ×' + portion) : '') + ' = ×' + mult);
-      lines.push('   Ингредиенты:');
-      (d.ingredients || []).forEach(function(ing) {
-        const n = (typeof normalizeIngName === 'function') ? normalizeIngName(ing.n) : ing.n;
-        lines.push('     • ' + n + ' — ' + Math.round((Number(ing.g) || 0) * mult) + ' г');
-      });
-      lines.push('   Приготовление:');
-      steps.forEach(function(s, i) {
-        var step = String(s);
-        if (mult > 1.05) {
-          step = step
-            .replace(/(\d+)\s*г(?![а-яёa-z])/gi, function(_, num) { return Math.round(Number(num) * mult) + ' г'; })
-            .replace(/(\d+)\s*мл(?![а-яёa-z])/gi, function(_, num) { return Math.round(Number(num) * mult) + ' мл'; });
-        }
-        lines.push('     ' + (i + 1) + '. ' + step);
-      });
-      if (R && R.tip) lines.push('   Совет: ' + R.tip);
-    });
-    lines.push('');
-  });
-
-  const text = lines.join('\n');
-  const ok = downloadTextFile('recepty-na-nedelyu.txt', text);
-  showTextModal(ok ? 'Рецепты на неделю (файл скачан)' : 'Рецепты на неделю', text);
+  const all = document.getElementById('recipesShowAll');
+  if (all) all.onchange = function() { state.book.showAll = all.checked; renderRecipeBook(); };
+  renderRecipeBook();
+  showScreen('recipes');
 }
 
+/** Книга строится из уже загруженных блюд, без запросов к серверу. */
+function renderRecipeBook() {
+  const b = state.book;
+  const chips = document.getElementById('recipeMealChips');
+  chips.innerHTML = BOOK_MEALS.map(function(m) {
+    const on = b.meal === m[0];
+    return '<button type="button" class="chip' + (on ? ' selected' : '') + '" aria-pressed="' + on + '" data-meal="' + m[0] + '">' + m[1] + '</button>';
+  }).join('');
+  chips.querySelectorAll('.chip').forEach(function(c) {
+    c.onclick = function() { b.meal = b.meal === c.dataset.meal ? '' : c.dataset.meal; renderRecipeBook(); };
+  });
+  const q = b.query.trim().toLowerCase().replace(/ё/g, 'е');
+  const matching = DISHES.filter(function(d) {
+    if (b.meal && d.meal !== b.meal) return false;
+    return !q || d.name.toLowerCase().replace(/ё/g, 'е').includes(q);
+  });
+  const allowed = matching.filter(passesRestrictions);
+  const hiddenCount = matching.length - allowed.length;
+  const shown = (b.showAll ? matching : allowed).slice().sort(function(x, y) { return x.name.localeCompare(y.name, 'ru'); });
+  const list = document.getElementById('recipeList');
+  list.innerHTML = shown.length ? shown.map(function(d) {
+    return '<button type="button" class="book-item" data-id="' + d.id + '">'
+      + '<img class="meal-thumb" src="' + dishPhoto(d) + '" alt="" loading="lazy" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">'
+      + '<span class="meal-thumb-fallback" style="display:none;background:' + dishGradient(d) + '">' + (d.emoji || '') + '</span>'
+      + '<span class="book-text"><span class="book-name">' + d.name + '</span>'
+      + '<span class="book-meta">' + d.time + ' мин · ' + d.kcal + ' ккал</span></span></button>';
+  }).join('') : '<p class="empty">Ничего не найдено</p>';
+  list.querySelectorAll('.book-item').forEach(function(el) {
+    el.onclick = function() { openRecipe(+el.dataset.id, { single: true }); };
+  });
+  const wrap = document.getElementById('recipesAllWrap');
+  if (wrap) {
+    wrap.hidden = !hiddenCount && !b.showAll;
+    const label = wrap.querySelector('span');
+    if (label) label.textContent = b.showAll ? 'Показать все' : 'Показать все (скрыто по опросу: ' + hiddenCount + ')';
+  }
+}
 
 function exportShopFile() {
   try { renderShop(); } catch (e) {}
@@ -4455,7 +4445,8 @@ on('swiperBack', function(){ showScreen('quiz'); });
   on('btnCopyShop', function(){ try { copyShop(); } catch(e){ alert(e.message); } });
   on('btnPrintShop', printShop);
   on('btnDownloadShop', exportShopFile);
-  on('btnExportRecipes', exportRecipes);
+  on('btnRecipes', openRecipeBook);
+  on('recipesBack', function(){ showScreen('menu'); });
   on('btnRestart', function() {
     if (confirm('Начать заново? Текущее меню будет удалено.')) {
       safeRemove('ration_v2');

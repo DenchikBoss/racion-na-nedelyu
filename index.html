@@ -30,15 +30,7 @@
     <div class="logo">🥗</div>
     <h1>Рацион на неделю</h1>
     <p>Собери меню под семью, бюджет и вкус — со списком покупок. Около 2 минут.</p>
-    <p class="ios-tip" style="font-size:.78rem;color:var(--text-muted);margin-top:10px;line-height:1.4">📱 Браузер, iPhone или Telegram. Готовое меню сохраняется и откроется при следующем входе. Цены — из prices_live.json.</p>
-    <div class="features">
-      <div class="feature"><span class="icon">👨‍👩‍👧</span><span>Меню на всю семью с учётом порций</span></div>
-      <div class="feature"><span class="icon">⚡</span><span>Короткий тест и свайп блюд</span></div>
-      <div class="feature"><span class="icon">📊</span><span>Сбалансированное КБЖУ на 7 дней</span></div>
-      <div class="feature"><span class="icon">🛒</span><span>Список покупок по отделам</span></div>
-    </div>
     <button class="btn btn-primary btn-block" id="startBtn">Собрать рацион</button>
-    <p class="disclaimer" style="margin-top:20px">Сервис не заменяет консультацию врача или диетолога. При заболеваниях обратитесь к специалисту.</p>
   </div>
 </section>
 
@@ -69,7 +61,7 @@
     <h1>Что тебе нравится?</h1>
     <button class="theme-toggle" data-theme-btn aria-label="Тема">🌙</button>
   </header>
-  <p style="color:var(--text-muted);font-size:.9rem;margin-bottom:8px;text-align:center">Вправо — нравится, влево — нет. Так соберём вкусовую карту.</p>
+  <p id="swipeHint" style="color:var(--text-muted);font-size:.9rem;margin-bottom:8px;text-align:center">Вправо — нравится, влево — нет. Так соберём вкусовую карту.</p>
   <div class="swiper-progress" id="swiperProgress">0 / 0</div>
   <div class="swiper-container">
     <div class="swiper-stack" id="swiperStack">
@@ -120,17 +112,34 @@
     <button class="theme-toggle" data-theme-btn aria-label="Тема">🌙</button>
   </header>
   <div class="summary-card" id="menuSummary"></div>
-  <div class="family-kcal-box" id="familyKcalBox"></div>
-  <div class="portions-bar" id="portionsBar"></div>
+  <details class="menu-details" id="menuDetails">
+    <summary>Подробнее: семья, порции, режим готовки</summary>
+    <div class="family-kcal-box" id="familyKcalBox"></div>
+    <div class="portions-bar" id="portionsBar"></div>
+    <div class="cook-plan" id="cookPlanBanner"></div>
+  </details>
   <nav class="day-tabs" id="dayTabs" aria-label="Дни недели"></nav>
   <div class="day-macros" id="dayMacros"></div>
   <div id="dayMeals"></div>
   <div class="nav-bottom" style="flex-direction:column;gap:10px">
     <button class="btn btn-primary btn-block" id="btnToShop">🛒 Список покупок</button>
-    <button class="btn btn-secondary btn-block" id="btnExportRecipes">📖 Скачать рецепты (.txt)</button>
+    <button class="btn btn-secondary btn-block" id="btnRecipes">📖 Рецепты</button>
     <button class="btn btn-ghost btn-block" id="btnRestart">🔄 Начать заново</button>
   </div>
   <p class="disclaimer">Сервис не заменяет консультацию врача. Минимальная калорийность ограничена для безопасности.</p>
+</section>
+
+<!-- RECIPE BOOK -->
+<section id="screen-recipes" class="screen">
+  <header class="header">
+    <button class="btn btn-ghost" id="recipesBack">← Меню</button>
+    <h1>Рецепты</h1>
+    <button class="theme-toggle" data-theme-btn aria-label="Тема">🌙</button>
+  </header>
+  <input type="search" id="recipeSearch" class="book-search" placeholder="Поиск по названию" aria-label="Поиск рецептов">
+  <div class="chips book-chips" id="recipeMealChips"></div>
+  <div id="recipeList" class="book-list"></div>
+  <label class="book-all" id="recipesAllWrap" hidden><input type="checkbox" id="recipesShowAll"> <span>Показать все</span></label>
 </section>
 
 <!-- SHOPPING -->
@@ -166,7 +175,6 @@
 <div class="modal-overlay" id="recipeModal">
   <div class="modal">
     <div id="recipeBody"></div>
-    <button class="btn btn-secondary btn-block" id="btnExportOneRecipe" style="margin-top:8px">⬇️ Скачать этот рецепт</button>
     <button class="btn btn-primary btn-block" id="closeRecipe" style="margin-top:8px">Закрыть</button>
   </div>
 </div>
