@@ -1561,27 +1561,17 @@ function tgInit() {
     try { if (tg.setBottomBarColor) tg.setBottomBarColor('bg_color'); } catch (e) {}
     try { if (typeof tg.disableVerticalSwipes === 'function') tg.disableVerticalSwipes(); } catch (e) {}
     try {
-      if (tg.setHeaderColor) tg.setHeaderColor('secondary_bg_color');
-      if (tg.setBackgroundColor) tg.setBackgroundColor('bg_color');
-    } catch (e) {}
-    try {
       var isDark = (tg.colorScheme === 'dark');
       document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
       document.body.classList.add('tg-miniapp');
       document.documentElement.classList.add('tg-miniapp');
-      var p = tg.themeParams || {};
-      if (p.bg_color) document.documentElement.style.setProperty('--bg', p.bg_color);
-      if (p.secondary_bg_color) document.documentElement.style.setProperty('--bg-card', p.secondary_bg_color);
-      if (p.text_color) document.documentElement.style.setProperty('--text', p.text_color);
-      if (p.hint_color) document.documentElement.style.setProperty('--text-muted', p.hint_color);
-      if (p.button_color) document.documentElement.style.setProperty('--primary', p.button_color);
-      if (p.button_text_color) document.documentElement.style.setProperty('--tg-btn-text', p.button_text_color);
+      syncThemeChrome();
     } catch (e) {}
     try {
       tg.onEvent('themeChanged', function() {
         var isDark = tg.colorScheme === 'dark';
         document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
-        try { updateThemeBtns(); } catch (e2) {}
+        try { updateThemeBtns(); syncThemeChrome(); } catch (e2) {}
       });
     } catch (e) {}
     try { tgBackForScreen(); tgMainButton(); if (tg.SettingsButton) tg.SettingsButton.hide(); } catch (e) {}
@@ -1638,14 +1628,26 @@ function themeInit() {
   } catch (e) { t = 'light'; }
   if (t !== 'dark' && t !== 'light') t = 'light';
   document.documentElement.setAttribute('data-theme', t);
-  try { updateThemeBtns(); } catch (e) {}
+  try { updateThemeBtns(); syncThemeChrome(); } catch (e) {}
+}
+/** Цвет шапки браузера и Telegram под текущую тему «Мята». */
+function syncThemeChrome() {
+  const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+  if (!bg) return;
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', bg);
+  try {
+    if (tg && tg.setHeaderColor) tg.setHeaderColor(bg);
+    if (tg && tg.setBackgroundColor) tg.setBackgroundColor(bg);
+    if (tg && tg.setBottomBarColor) tg.setBottomBarColor(bg);
+  } catch (e) {}
 }
 function toggleTheme() {
   var cur = document.documentElement.getAttribute('data-theme');
   var next = cur === 'dark' ? 'light' : 'dark';
   document.documentElement.setAttribute('data-theme', next);
   safeSet('ration_theme', next);
-  try { updateThemeBtns(); } catch (e) {}
+  try { updateThemeBtns(); syncThemeChrome(); } catch (e) {}
 }
 function updateThemeBtns() {
   const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
@@ -3871,7 +3873,7 @@ function openRecipe(dishId, mealCtx) {
 
     var banner = '';
     if (ctx.leftover) {
-      banner = '<div style="margin-bottom:12px;padding:10px 12px;border-radius:10px;background:color-mix(in srgb,#f59e0b 15%,transparent);font-size:.88rem">♻️ <strong>Разогрев</strong>'
+      banner = '<div style="margin-bottom:12px;padding:10px 12px;border-radius:10px;background:var(--badge-bg);color:var(--badge-ink);font-size:.88rem">♻️ <strong>Разогрев</strong>'
         + (ctx.note ? (': ' + ctx.note) : '')
         + '. Готовить заново не нужно.' + (ctx.storage ? ' ' + ctx.storage : '') + '</div>';
     } else if (Number(ctx.coversDays) > 1) {
