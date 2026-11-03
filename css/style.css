@@ -1492,3 +1492,15 @@ html.tg-fullscreen #recipeModal, html.tg-fullscreen #replaceModal, html.tg-fulls
 }
 input.input-error { border-color: var(--danger) !important; }
 .meal-storage { color: var(--text-muted); font-size: .8rem; margin-top: 4px; line-height: 1.35; }
+
+/* «Есть дома» / «К покупке» */
+.shop-tabs { display: flex; gap: 4px; padding: 4px; margin-bottom: 12px; border-radius: 24px; background: var(--border); }
+.shop-tab { flex: 1; min-height: 44px; border: none; border-radius: 20px; background: transparent; color: var(--text-muted); font: inherit; font-weight: 700; cursor: pointer; }
+.shop-tab.active { background: var(--bg-card); color: var(--text); box-shadow: var(--shadow); }
+#screen-shop .home-row { width: 100%; text-align: left; font: inherit; color: var(--text); background: transparent; border: none; border-bottom: 1px solid var(--border); cursor: pointer; min-height: 44px; }
+#screen-shop .home-row .name { flex: 1; }
+#screen-shop .home-row.is-home .name { text-decoration: line-through; color: var(--text-muted); }
+#screen-shop .home-row.is-home .prod-icon { filter: grayscale(1); opacity: .55; }
+#screen-shop .home-row.is-home .qty { color: var(--text-muted); }
+.home-badge { flex-shrink: 0; padding: 3px 10px; border-radius: 999px; background: var(--border); color: var(--text); font-size: .75rem; font-weight: 700; }
+#shopBuyActions .btn + .btn { margin-top: 8px; }

@@ -1267,6 +1267,8 @@ const state = {
   norms: null,
   menu: null,
   shopChecks: {},
+  homeChecks: {}, // «Есть дома»: отдельно от «куплено»
+  shopTab: 'home',
   currentDay: 0,
   familyPortions: 1, // multiplier for display/shopping
   replaceCtx: null,
@@ -1414,6 +1416,7 @@ function save() {
     norms: state.norms,
     menu: state.menu,
     shopChecks: state.shopChecks,
+    homeChecks: state.homeChecks,
     familyPortions: state.familyPortions,
     cookPlan: state.cookPlan,
     savedAt: Date.now()
@@ -1448,6 +1451,7 @@ function load() {
       return day;
     });
     state.shopChecks = data.shopChecks || {};
+    state.homeChecks = data.homeChecks || {};
     if (data.familyPortions != null) state.familyPortions = data.familyPortions;
     if (data.cookPlan) state.cookPlan = data.cookPlan;
     state.currentDay = 0;
@@ -4043,112 +4047,154 @@ function roundToPack(grams, pack) {
   return Math.max(1, Math.ceil(grams / 100)) + ' уп.';
 }
 
+/** Позиции списка покупок на неделю: одна сборка для экрана, итога и выгрузок. */
+function shopItems() {
+  if (!state.menu || !state.menu.length) return [];
+  const scale = shoppingScale();
+  const items = {};
+  state.menu.forEach(function(day) {
+    (day.meals || []).forEach(function(m) {
+      if (!m || !m.dish || !Array.isArray(m.dish.ingredients)) return;
+      if (m.leftover) return; // уже посчитано в день готовки
+      const portion = Number(m.portion) || 1;
+      const cover = (Number(m.coversDays) > 1) ? Number(m.coversDays) : 1;
+      m.dish.ingredients.forEach(function(raw) {
+        if (!raw || raw.n == null) return;
+        const ing = normalizeIng(raw);
+        const key = ing.n || String(raw.n);
+        if (!items[key]) items[key] = { n: key, g: 0, d: ing.d || raw.d || 'прочее' };
+        items[key].g += Math.round(Number(ing.g || raw.g || 0) * portion * cover * scale);
+        if (ING_DEPT[key]) items[key].d = ING_DEPT[key];
+      });
+    });
+  });
+  return Object.values(items).map(function(it) {
+    if (!(it.d in DEPTS)) it.d = 'прочее';
+    it.qty = formatShopQty(it);
+    it.home = !!state.homeChecks[it.n];
+    it.bought = !!state.shopChecks[it.n];
+    return it;
+  }).sort(function(a, b) { return String(a.n).localeCompare(String(b.n), 'ru'); });
+}
+
+function formatShopQty(it) {
+  if (/яйц/i.test(it.n)) return Math.ceil(it.g / 50) + ' шт.';
+  if (it.g >= 1000) return (it.g / 1000).toFixed(1).replace('.0', '') + ' кг';
+  return Math.max(10, Math.ceil(it.g / 10) * 10) + ' г';
+}
+
+/** То, что нужно купить: всё, кроме отмеченного «дома». */
+function itemsToBuy() {
+  return shopItems().filter(function(it) { return !it.home; });
+}
+
+function shopCost(items) {
+  return Math.round(items.reduce(function(sum, it) { return sum + priceFor(it.n, it.g); }, 0));
+}
+
+const SHOP_DEPT_ORDER = ['овощи', 'мясо', 'молочное', 'бакалея', 'прочее'];
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
+
 function renderShop() {
   if (!state.shopChecks || typeof state.shopChecks !== 'object') state.shopChecks = {};
+  if (!state.homeChecks || typeof state.homeChecks !== 'object') state.homeChecks = {};
   const listEl = document.getElementById('shopList');
   const totalEl = document.getElementById('shopTotal');
   const noteEl = document.getElementById('priceNote');
+  const tabsEl = document.getElementById('shopTabs');
+  const homeActions = document.getElementById('shopHomeActions');
+  const buyActions = document.getElementById('shopBuyActions');
+  if (!listEl) return;
 
   if (!state.menu || !state.menu.length) {
-    if (listEl) listEl.innerHTML = '<p class="empty">Сначала соберите меню на неделю</p>';
+    listEl.innerHTML = '<p class="empty">Сначала соберите меню на неделю</p>';
     if (totalEl) totalEl.innerHTML = '';
     return;
   }
+  try { if (!LIVE_PRICES || !Object.keys(LIVE_PRICES).length) refreshPrices(); } catch (e) {}
 
-  try { if (typeof LIVE_PRICES === 'undefined' || !LIVE_PRICES || !Object.keys(LIVE_PRICES).length) refreshPrices(); } catch (e) {}
+  const tab = state.shopTab === 'buy' ? 'buy' : 'home';
+  const all = shopItems();
+  const homeCount = all.filter(function(it) { return it.home; }).length;
+  const shown = tab === 'home' ? all : all.filter(function(it) { return !it.home; });
+  const scale = shoppingScale();
 
-  const scale = (typeof shoppingScale === 'function') ? shoppingScale() : ((state.norms && state.norms.scale) || state.familyPortions || 1);
-  const items = {};
+  if (tabsEl) {
+    tabsEl.innerHTML = [['home', 'Есть дома'], ['buy', 'К покупке']].map(function(t) {
+      const on = t[0] === tab;
+      return '<button type="button" role="tab" class="shop-tab' + (on ? ' active' : '') + '" aria-selected="' + on + '" data-tab="' + t[0] + '">' + t[1] + '</button>';
+    }).join('');
+    tabsEl.querySelectorAll('.shop-tab').forEach(function(b) {
+      b.onclick = function() { state.shopTab = b.dataset.tab; renderShop(); };
+    });
+  }
 
-  try {
-    state.menu.forEach(function(day) {
-      (day.meals || []).forEach(function(m) {
-        if (!m || !m.dish || !Array.isArray(m.dish.ingredients)) return;
-        if (m.leftover) return; // already counted on batch cook day
-        const portion = Number(m.portion) || 1;
-        const cover = (Number(m.coversDays) > 1) ? Number(m.coversDays) : 1;
-        m.dish.ingredients.forEach(function(raw) {
-          if (!raw || raw.n == null) return;
-          try {
-            const ing = normalizeIng(raw);
-            const key = ing.n || String(raw.n);
-            if (!items[key]) items[key] = { n: key, g: 0, d: ing.d || raw.d || 'прочее', pack: raw.pack };
-            items[key].g += Math.round(Number(ing.g || raw.g || 0) * portion * cover * scale);
-            if (typeof ING_DEPT !== 'undefined' && ING_DEPT[key]) items[key].d = ING_DEPT[key];
-          } catch (e) {}
+  if (tab === 'home') {
+    if (totalEl) totalEl.innerHTML = '<span>Отметьте то, что уже есть дома: в корзину это не попадёт</span>';
+    if (noteEl) noteEl.textContent = 'Отмечено дома: ' + homeCount + ' из ' + all.length;
+  } else {
+    const cost = shopCost(shown);
+    if (totalEl) totalEl.innerHTML = '<span>Ориентир на семью (×' + scale + ')</span><strong>~' + cost.toLocaleString('ru-RU') + ' ₽</strong>';
+    if (noteEl) noteEl.textContent = 'К покупке: ' + shown.length + ' · дома: ' + homeCount + ' · ' + priceSourceText();
+  }
+  if (homeActions) homeActions.style.display = tab === 'home' ? '' : 'none';
+  if (buyActions) buyActions.style.display = tab === 'buy' ? '' : 'none';
+
+  let html = '';
+  SHOP_DEPT_ORDER.forEach(function(dept) {
+    const rows = shown.filter(function(it) { return it.d === dept; });
+    if (!rows.length) return; // раздел без позиций скрыт
+    html += '<div class="shop-section" data-dept="' + dept + '">';
+    html += '<h3>' + (DEPTS[dept] || dept) + ' <button type="button" class="mark-all" data-dept="' + dept + '">Отметить всё</button></h3>';
+    rows.forEach(function(it) {
+      const icon = ingIcon(it.n) || '🥗';
+      const name = escapeHtml(it.n);
+      if (tab === 'home') {
+        html += '<button type="button" class="shop-item home-row' + (it.home ? ' is-home' : '') + '" aria-pressed="' + it.home + '" data-n="' + name + '">'
+          + '<span class="prod-icon">' + icon + '</span><span class="name">' + name + '</span>'
+          + '<span class="qty">' + it.qty + '</span>' + (it.home ? '<span class="home-badge">Дома</span>' : '') + '</button>';
+      } else {
+        const id = 'shop-' + cssEscape(it.n);
+        html += '<div class="shop-item' + (it.bought ? ' checked' : '') + '">'
+          + '<input type="checkbox" id="' + id + '" ' + (it.bought ? 'checked' : '') + ' data-n="' + name + '">'
+          + '<span class="prod-icon">' + icon + '</span><label for="' + id + '">' + name + '</label>'
+          + '<span class="qty">' + it.qty + '</span></div>';
+      }
+    });
+    html += '</div>';
+  });
+  if (!html) {
+    html = tab === 'buy' && all.length
+      ? '<p class="empty">Всё есть дома — покупать ничего не нужно</p>'
+      : '<p class="empty">Список пуст — в блюдах нет ингредиентов</p>';
+  }
+  listEl.innerHTML = html;
+
+  if (tab === 'home') {
+    listEl.querySelectorAll('.home-row').forEach(function(row) {
+      row.onclick = function() {
+        const n = row.getAttribute('data-n');
+        state.homeChecks[n] = !state.homeChecks[n];
+        if (!state.homeChecks[n]) delete state.homeChecks[n];
+        save();
+        renderShop();
+      };
+    });
+    listEl.querySelectorAll('.mark-all').forEach(function(btn) {
+      btn.onclick = function() {
+        btn.closest('.shop-section').querySelectorAll('.home-row').forEach(function(row) {
+          state.homeChecks[row.getAttribute('data-n')] = true;
         });
-      });
+        save();
+        renderShop();
+      };
     });
-  } catch (e) { console.error('shop aggregate', e); }
-
-  const groups = {};
-  Object.keys(items).forEach(function(k) {
-    const it = items[k];
-    let dept = it.d;
-    if (typeof DEPTS !== 'undefined' && !(dept in DEPTS)) dept = 'прочее';
-    if (!dept) dept = 'прочее';
-    if (!groups[dept]) groups[dept] = [];
-    groups[dept].push(it);
-  });
-
-  let weekCost = 0;
-  try { weekCost = estimateWeekCost(); } catch (e) {}
-  // Recompute cost with same scale for consistency
-  try {
-    weekCost = 0;
-    Object.keys(items).forEach(function(k) {
-      const it = items[k];
-      if (typeof priceFor === 'function') weekCost += priceFor(it.n, it.g);
-    });
-    weekCost = Math.round(weekCost);
-  } catch (e) {}
-
-  if (totalEl) {
-    totalEl.innerHTML = '<span>Ориентир на семью (×' + scale + ')</span><strong>~' + weekCost.toLocaleString('ru-RU') + ' ₽</strong>';
-  }
-  if (noteEl) {
-    const adults = (state.quiz && state.quiz.adults) || 1;
-    const kids = (state.quiz && state.quiz.kidsCount) || 0;
-    noteEl.textContent = priceSourceText() + ' · ' + adults + ' взр.' + (kids ? (' + ' + kids + ' реб.') : '') + ' · закупка ×' + scale;
-  }
-
-  const order = ['овощи', 'мясо', 'молочное', 'бакалея', 'прочее'];
-  let htmlStr = '';
-  let totalItems = 0;
-  order.forEach(function(dept) {
-    if (!groups[dept] || !groups[dept].length) return;
-    const title = (typeof DEPTS !== 'undefined' && DEPTS[dept]) ? DEPTS[dept] : dept;
-    htmlStr += '<div class="shop-section" data-dept="' + dept + '">';
-    htmlStr += '<h3>' + title + ' <button type="button" class="mark-all" data-dept="' + dept + '">Отметить всё</button></h3>';
-    groups[dept].sort(function(a, b) { return String(a.n).localeCompare(String(b.n), 'ru'); }).forEach(function(it) {
-      totalItems++;
-      const checked = state.shopChecks[it.n] ? 'checked' : '';
-      let qty;
-      if (/яйц/i.test(it.n)) qty = Math.ceil(it.g / 50) + ' шт.';
-      else if (it.g >= 1000) qty = (it.g / 1000).toFixed(1).replace('.0', '') + ' кг';
-      else qty = (Math.max(10, Math.ceil(it.g / 10) * 10)) + ' г';
-      let icon = '🥗'; try { if (typeof ingIcon === 'function') icon = ingIcon(it.n) || '🥗'; } catch (e) {}
-      const id = 'shop-' + cssEscape(it.n);
-      const safeName = String(it.n).replace(/&/g,'&amp;').replace(/"/g, '&quot;').replace(/</g,'&lt;');
-      htmlStr += '<div class="shop-item ' + checked + '">';
-      htmlStr += '<input type="checkbox" id="' + id + '" ' + (checked ? 'checked' : '') + ' data-n="' + safeName + '">';
-      htmlStr += '<span class="prod-icon">' + icon + '</span>';
-      htmlStr += '<label for="' + id + '">' + safeName + '</label>';
-      htmlStr += '<span class="qty">' + qty + '</span>';
-      htmlStr += '</div>';
-    });
-    htmlStr += '</div>';
-  });
-
-  if (listEl) {
-    if (!htmlStr) {
-      listEl.innerHTML = '<p class="empty">Список пуст — в блюдах нет ингредиентов</p>';
-    } else {
-      listEl.innerHTML = '<p style="font-size:.8rem;color:var(--text-muted);margin-bottom:8px">Позиций: ' + totalItems + ' · коэффициент семьи ×' + scale + '</p>' + htmlStr;
-    }
+  } else {
     listEl.querySelectorAll('input[type=checkbox]').forEach(function(cb) {
       cb.onchange = function() {
-        if (!state.shopChecks) state.shopChecks = {};
         state.shopChecks[cb.getAttribute('data-n')] = cb.checked;
         const row = cb.closest('.shop-item');
         if (row) row.classList.toggle('checked', cb.checked);
@@ -4157,11 +4203,8 @@ function renderShop() {
     });
     listEl.querySelectorAll('.mark-all').forEach(function(btn) {
       btn.onclick = function() {
-        const sec = btn.closest('.shop-section');
-        if (!sec) return;
-        sec.querySelectorAll('input[type=checkbox]').forEach(function(cb) {
+        btn.closest('.shop-section').querySelectorAll('input[type=checkbox]').forEach(function(cb) {
           cb.checked = true;
-          if (!state.shopChecks) state.shopChecks = {};
           state.shopChecks[cb.getAttribute('data-n')] = true;
           const row = cb.closest('.shop-item');
           if (row) row.classList.add('checked');
@@ -4172,79 +4215,22 @@ function renderShop() {
   }
 }
 
-
-
-
-
+/** Текстовая выгрузка: только то, что нужно купить. */
 function buildShopText() {
   const lines = [
     'Список покупок — Рацион на неделю',
     'Формат для заметок: отметьте - [ ] → - [x]',
     ''
   ];
-  const list = $('#shopList');
-  let fromDom = false;
-  if (list && list.querySelectorAll('.shop-item').length) {
-    fromDom = true;
-    list.querySelectorAll('.shop-section').forEach(sec => {
-      const h3 = sec.querySelector('h3');
-      let title = '';
-      if (h3) {
-        title = Array.from(h3.childNodes)
-          .filter(n => n.nodeType === 3)
-          .map(n => n.textContent.trim())
-          .join(' ')
-          .trim() || (h3.textContent || '').replace('Отметить всё', '').trim();
-      }
-      if (title) lines.push('## ' + title);
-      sec.querySelectorAll('.shop-item').forEach(item => {
-        const name = (item.querySelector('label') || {}).textContent || '';
-        const qty = (item.querySelector('.qty') || {}).textContent || '';
-        const done = item.classList.contains('checked') || (item.querySelector('input') || {}).checked ? '✓' : '☐';
-        if (name) lines.push(done + ' ' + name + ' — ' + qty);
-      });
-      lines.push('');
-    });
-  }
-  if (!fromDom && state.menu && state.menu.length) {
-    // build from menu state
-    const scale = (typeof shoppingScale === 'function') ? shoppingScale() : ((state.norms && state.norms.scale) || state.familyPortions || 1);
-    const items = {};
-    state.menu.forEach(day => {
-      (day.meals || []).forEach(m => {
-        if (!m || !m.dish || !m.dish.ingredients) return;
-        if (m.leftover) return;
-        const portion = Number(m.portion) || 1;
-        const cover = (Number(m.coversDays) > 1) ? Number(m.coversDays) : 1;
-        m.dish.ingredients.forEach(raw => {
-          const ing = normalizeIng(raw);
-          if (!items[ing.n]) items[ing.n] = {n: ing.n, g: 0, d: ing.d};
-          items[ing.n].g += Math.round(Number(ing.g || 0) * portion * cover * scale);
-        });
-      });
-    });
-    const order = ['овощи','мясо','молочное','бакалея','прочее'];
-    const groups = {};
-    Object.values(items).forEach(it => {
-      const dept = (it.d in DEPTS) ? it.d : 'прочее';
-      if (!groups[dept]) groups[dept] = [];
-      groups[dept].push(it);
-    });
-    order.forEach(dept => {
-      if (!groups[dept]) return;
-      lines.push('## ' + (DEPTS[dept] || dept));
-      groups[dept].sort((a,b) => a.n.localeCompare(b.n)).forEach(it => {
-        let qty;
-        if (/яйц/i.test(it.n)) qty = Math.ceil(it.g / 50) + ' шт.';
-        else if (it.g >= 1000) qty = (it.g / 1000).toFixed(1).replace('.0','') + ' кг';
-        else qty = Math.ceil(it.g / 10) * 10 + ' г';
-        const box = (state.shopChecks && state.shopChecks[it.n]) ? '- [x]' : '- [ ]';
-        lines.push(box + ' ' + it.n + ' — ' + qty);
-      });
-      lines.push('');
-    });
-  }
-  if (lines.length <= 2) lines.push('Список пуст');
+  const items = itemsToBuy();
+  SHOP_DEPT_ORDER.forEach(function(dept) {
+    const rows = items.filter(function(it) { return it.d === dept; });
+    if (!rows.length) return;
+    lines.push('## ' + (DEPTS[dept] || dept));
+    rows.forEach(function(it) { lines.push((it.bought ? '- [x] ' : '- [ ] ') + it.n + ' — ' + it.qty); });
+    lines.push('');
+  });
+  if (!items.length) lines.push('Список пуст');
   return lines.join('\n');
 }
 
@@ -4308,13 +4294,19 @@ async function copyShop() {
 function printShop() {
   try { renderShop(); } catch (e) {}
   const text = buildShopText();
-  const cost = (typeof estimateWeekCost === 'function') ? estimateWeekCost() : 0;
+  const cost = shopCost(itemsToBuy());
   const w = window.open('', '_blank');
   if (!w) {
     showTextModal('Список покупок (печать)', text);
     return;
   }
-  const listHtml = ($('#shopList') && $('#shopList').innerHTML) || '';
+  const listHtml = SHOP_DEPT_ORDER.map(function(dept) {
+    const rows = itemsToBuy().filter(function(it) { return it.d === dept; });
+    if (!rows.length) return '';
+    return '<h3>' + escapeHtml(DEPTS[dept] || dept) + '</h3>' + rows.map(function(it) {
+      return '<div class="shop-item"><label>' + (it.bought ? '✓ ' : '☐ ') + escapeHtml(it.n) + '</label><span class="qty">' + it.qty + '</span></div>';
+    }).join('');
+  }).join('');
   w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Список покупок</title>' +
     '<style>body{font-family:system-ui,sans-serif;padding:20px;max-width:480px;margin:0 auto;color:#1c1917}' +
     'h1{font-size:1.25rem}h3{margin-top:18px;border-bottom:1px solid #ddd;padding-bottom:6px;font-size:1rem}' +
@@ -4451,10 +4443,12 @@ function init() {
   on('btnInsightBuild', startMenuBuild);
   on('btnInsightMore', continueSwiping);
   on('btnToShop', function() {
+    state.shopTab = 'home';
     try { renderShop(); } catch (e) { console.error('renderShop', e); }
     showScreen('shop');
   });
   on('shopBack', function(){ showScreen('menu'); });
+  on('btnHomeDone', function() { state.shopTab = 'buy'; renderShop(); window.scrollTo(0, 0); });
 on('swiperBack', function(){ showScreen('quiz'); });
   on('btnCopyShop', function(){ try { copyShop(); } catch(e){ alert(e.message); } });
   on('btnPrintShop', printShop);
@@ -4472,6 +4466,7 @@ on('swiperBack', function(){ showScreen('quiz'); });
       state.menu = null;
       state.norms = null;
       state.shopChecks = {};
+      state.homeChecks = {};
       state.cookPlan = null;
       state.taste = newTaste();
       state.currentDay = 0;

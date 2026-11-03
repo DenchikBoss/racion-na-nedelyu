@@ -137,10 +137,14 @@
     <h1>Список покупок</h1>
     <button class="theme-toggle" data-theme-btn aria-label="Тема">🌙</button>
   </header>
+  <div class="shop-tabs" id="shopTabs" role="tablist" aria-label="Список покупок"></div>
   <div class="shop-total" id="shopTotal"></div>
   <p class="price-note" id="priceNote" style="margin-bottom:12px"></p>
   <div id="shopList"></div>
-  <div class="footer-actions">
+  <div class="footer-actions" id="shopHomeActions">
+    <button class="btn btn-primary btn-block" id="btnHomeDone">Готово, к покупкам</button>
+  </div>
+  <div class="footer-actions" id="shopBuyActions" style="display:none">
     <button class="btn btn-primary btn-block" id="btnCopyShop">📋 Копировать список</button>
     <button class="btn btn-secondary btn-block" id="btnDownloadShop">⬇️ Скачать .txt</button>
     <button class="btn btn-secondary btn-block" id="btnPrintShop">🖨 Печать</button>
