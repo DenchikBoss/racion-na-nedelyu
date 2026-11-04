@@ -1162,9 +1162,9 @@ const QUIZ_STEPS = [
     hint: "Для основного едока. На семью масштабируем порции.",
     view: "segment",
     options: [
-      {v:"3", l:"3"},
-      {v:"4", l:"4"},
-      {v:"5", l:"5"}
+      {v:"3", l:"3", sub:"приёма", desc:"Завтрак · обед · ужин"},
+      {v:"4", l:"4", sub:"приёма", desc:"Завтрак · обед · перекус · ужин"},
+      {v:"5", l:"5", sub:"приёмов", desc:"Завтрак · перекус · обед · перекус · ужин"}
     ]
   },
   {
@@ -1240,6 +1240,7 @@ const DISLIKES = [
   {v:"лук", l:"Лук", icon:"🧅"},
   {v:"чеснок", l:"Чеснок", icon:"🧄"},
   {v:"баклажаны", l:"Баклажаны", icon:"🍆"},
+  {v:"помидоры", l:"Помидоры", icon:"🍅"},
   {v:"острое", l:"Острое", icon:"🌶️"},
   {v:"свинина", l:"Свинина", icon:"🥓"},
   {v:"красное мясо", l:"Красное мясо", icon:"🥩"},
@@ -2193,6 +2194,14 @@ function calcNorms(q) {
 }
 
 // ===================== QUIZ =====================
+/** Под переключателем — из чего состоит выбранный вариант (например, приёмы пищи за день). */
+function renderSegCaption(step) {
+  const box = document.getElementById('segCaption');
+  if (!box) return;
+  const opt = (step.options || []).find(o => o.v === String(state.quiz[step.id]));
+  box.textContent = opt && opt.desc ? opt.desc : 'Выберите вариант';
+}
+
 /** Полоска из семи дней: когда готовим, когда разогреваем, когда быстрое. */
 function renderCookStrip(step) {
   const box = document.getElementById('cookStrip');
@@ -2409,7 +2418,7 @@ function renderQuiz() {
     const groups = [
       { key: 'diet', title: 'Питание', items: [{v: 'vegetarian', l: '🌱 Вегетарианство'}, {v: 'vegan', l: '🥬 Веганство'}] },
       { key: 'allergens', title: 'Аллергии и непереносимость', items: ALLERGENS.map(o => ({v: o.v, l: o.icon + ' ' + o.l})), frequent: ['лактоза', 'глютен', 'орехи', 'яйца', 'рыба'] },
-      { key: 'dislikes', title: 'Не люблю', items: DISLIKES.map(o => ({v: o.v, l: o.icon + ' ' + o.l})), frequent: ['лук', 'грибы', 'свинина', 'красное мясо', 'острое'] }
+      { key: 'dislikes', title: 'Не люблю', items: DISLIKES.map(o => ({v: o.v, l: o.icon + ' ' + o.l})), frequent: ['лук', 'грибы', 'помидоры', 'свинина', 'красное мясо'] }
     ];
     groups.forEach(g => {
       const open = state.restrictionsOpen && state.restrictionsOpen[g.key];
@@ -2454,9 +2463,11 @@ function renderQuiz() {
       html += `<div class="${step.view === 'segment' ? 'segment' : 'chips option-chips'}" role="radiogroup">`;
       step.options.forEach(o => {
         const sel = state.quiz[step.id] === o.v;
-        html += `<button type="button" role="radio" aria-checked="${sel}" class="option ${step.view === 'segment' ? 'seg-opt' : 'chip'} ${sel ? 'selected' : ''}" data-v="${o.v}">${o.l}</button>`;
+        const label = o.sub ? `<span class="seg-num">${o.l}</span><span class="seg-sub">${o.sub}</span>` : o.l;
+        html += `<button type="button" role="radio" aria-checked="${sel}" class="option ${step.view === 'segment' ? 'seg-opt' : 'chip'} ${sel ? 'selected' : ''}" data-v="${o.v}">${label}</button>`;
       });
       html += '</div>';
+      if (step.view === 'segment') html += '<p class="seg-caption" id="segCaption"></p>';
     } else {
       const cls = step.grid ? 'option-grid' : 'options';
       html += `<div class="${cls}">`;
@@ -2478,9 +2489,11 @@ function renderQuiz() {
         el.setAttribute('aria-checked', 'true');
         $('#quizNext').disabled = false;
         if (step.id === 'cookDays') renderCookStrip(step);
+        renderSegCaption(step);
       };
     });
     if (step.id === 'cookDays') renderCookStrip(step);
+    renderSegCaption(step);
     $('#quizNext').disabled = !state.quiz[step.id];
     return;
   }
@@ -2506,7 +2519,7 @@ function renderQuiz() {
     const selected = state.quiz[step.id] || [];
     step.options.forEach(o => {
       const sel = selected.includes(o.v) ? 'selected' : '';
-      html += `<div class="chip ${sel}" data-v="${o.v}">${o.l}</div>`;
+      html += `<button type="button" class="chip ${sel}" aria-pressed="${!!sel}" data-v="${o.v}">${o.l}</button>`;
     });
     html += '</div>';
     c.innerHTML = html;
@@ -2522,6 +2535,7 @@ function renderQuiz() {
           state.quiz[step.id] = arr;
           el.classList.add('selected');
         }
+        el.setAttribute('aria-pressed', el.classList.contains('selected'));
         // kitchen can be empty? allow at least proceed
         $('#quizNext').disabled = false;
       };
@@ -2680,6 +2694,7 @@ const DISLIKE_PATTERNS = {
   'чеснок': /чеснок|чесноч/,
   'грибы': /гриб|шампиньон/,
   'баклажаны': /баклажан|рататуй|мусака/,
+  'помидоры': /помидор|томат|черри|кетчуп|шакшук/,
   'острое': /чили|острый|острое/,
   'свинина': /свин|бекон|сосиск|колбас|ветчин/,
   'красное мясо': /говяд|говяж|бефстроган|свин|бекон|сосиск|колбас|ветчин/,
