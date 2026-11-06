@@ -1,12 +1,12 @@
 {
-  "updated": "2026-11-06T12:45:57",
+  "updated": "2026-11-06T19:53:26",
   "sources": {
     "Магнит": "https://magnit.ru/webgate/v2/goods/search"
   },
   "Магнит": {
     "chicken_breast": 319.99,
     "turkey": 599.98,
-    "beef": 388.86,
+    "beef": 799.98,
     "fish_white": 299.99,
     "salmon": 919.98,
     "eggs": 75.39,
@@ -19,7 +19,7 @@
     "rice": 39.61,
     "bulgur": 177.76,
     "pasta": 44.97,
-    "quinoa": 355.53,
+    "quinoa": 419.98,
     "potato": 36.99,
     "carrot": 32.99,
     "cabbage": 34.99,
@@ -39,7 +39,7 @@
     "lentils": 224.97,
     "beans": 166.64,
     "bread": 45.8,
-    "cheese": 729.9,
+    "cheese": 699.9,
     "hummus": 549.9
   }
 }
