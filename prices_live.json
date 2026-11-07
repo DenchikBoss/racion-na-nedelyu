@@ -1,12 +1,12 @@
 {
-  "updated": "2026-11-07T11:34:42",
+  "updated": "2026-11-07T17:58:30",
   "sources": {
     "Магнит": "https://magnit.ru/webgate/v2/goods/search"
   },
   "Магнит": {
-    "chicken_breast": 559.96,
+    "chicken_breast": 319.99,
     "turkey": 599.98,
-    "beef": 629.99,
+    "beef": 549.98,
     "fish_white": 299.99,
     "salmon": 919.98,
     "eggs": 74.99,
@@ -27,7 +27,7 @@
     "zucchini": 199.99,
     "cucumber": 54.99,
     "tomato": 147.04,
-    "onion": 37.99,
+    "onion": 9996.67,
     "greens": 599.88,
     "apple": 79.95,
     "banana": 174.95,
@@ -39,7 +39,7 @@
     "lentils": 224.97,
     "beans": 166.64,
     "bread": 45.8,
-    "cheese": 833.28,
+    "cheese": 729.9,
     "hummus": 549.9
   }
 }
