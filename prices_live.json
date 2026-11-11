@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-11T12:30:37",
+  "updated": "2026-11-11T20:03:12",
   "sources": {
     "Магнит": "https://magnit.ru/webgate/v2/goods/search"
   },
@@ -26,7 +26,7 @@
     "broccoli": 329.99,
     "zucchini": 219.99,
     "cucumber": 45.99,
-    "tomato": 149.99,
+    "tomato": 176.46,
     "onion": 35.99,
     "greens": 599.88,
     "apple": 79.95,
@@ -38,7 +38,7 @@
     "chickpeas": 149.97,
     "lentils": 222.2,
     "beans": 166.64,
-    "bread": 45.8,
+    "bread": 46.53,
     "cheese": 729.9,
     "hummus": 549.9
   }
