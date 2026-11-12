@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-12T02:09:28",
+  "updated": "2026-11-12T13:35:55",
   "sources": {
     "Магнит": "https://magnit.ru/webgate/v2/goods/search"
   },
@@ -11,8 +11,8 @@
     "salmon": 919.98,
     "eggs": 74.99,
     "cottage": 266.6,
-    "kefir": 56.24,
-    "milk": 88.88,
+    "kefir": 88.88,
+    "milk": 95.54,
     "yogurt": 209.97,
     "oats": 49.97,
     "buckwheat": 57.49,
@@ -34,12 +34,12 @@
     "berries": 269.9,
     "nuts": 599.9,
     "oil": 96.66,
-    "tofu": 244.44,
+    "tofu": 116.0,
     "chickpeas": 149.97,
     "lentils": 222.2,
     "beans": 166.64,
-    "bread": 46.53,
-    "cheese": 729.9,
+    "bread": 45.8,
+    "cheese": 833.28,
     "hummus": 549.9
   }
 }
