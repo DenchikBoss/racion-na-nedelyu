@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-13T12:54:53",
+  "updated": "2026-11-13T20:23:11",
   "sources": {
     "Магнит": "https://magnit.ru/webgate/v2/goods/search"
   },
@@ -11,7 +11,7 @@
     "salmon": 919.98,
     "eggs": 78.89,
     "cottage": 266.6,
-    "kefir": 56.24,
+    "kefir": 88.88,
     "milk": 88.88,
     "yogurt": 209.97,
     "oats": 49.97,
@@ -39,7 +39,7 @@
     "lentils": 222.2,
     "beans": 166.64,
     "bread": 45.8,
-    "cheese": 833.28,
+    "cheese": 729.9,
     "hummus": 549.9
   }
 }
