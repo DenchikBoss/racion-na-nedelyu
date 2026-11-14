@@ -1,11 +1,11 @@
 {
-  "updated": "2026-11-14T11:58:41",
+  "updated": "2026-11-14T18:40:55",
   "sources": {
     "Магнит": "https://magnit.ru/webgate/v2/goods/search"
   },
   "Магнит": {
     "chicken_breast": 424.98,
-    "turkey": 599.98,
+    "turkey": 559.98,
     "beef": 388.86,
     "fish_white": 299.99,
     "salmon": 919.98,
@@ -13,7 +13,7 @@
     "cottage": 266.6,
     "kefir": 88.88,
     "milk": 88.88,
-    "yogurt": 209.97,
+    "yogurt": 155.53,
     "oats": 49.97,
     "buckwheat": 56.99,
     "rice": 39.61,
@@ -38,8 +38,8 @@
     "chickpeas": 149.97,
     "lentils": 222.2,
     "beans": 166.64,
-    "bread": 45.8,
+    "bread": 46.53,
     "cheese": 729.9,
-    "hummus": 549.9
+    "hummus": 749.95
   }
 }
